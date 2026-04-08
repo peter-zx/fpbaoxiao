@@ -5,905 +5,870 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>报销费用填写工具</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
             font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #f0f2f5;
             min-height: 100vh;
-            padding: 20px;
         }
-        
-        .container {
-            max-width: 1200px;
+
+        /* ========== 顶部导航 ========== */
+        .top-bar {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 16px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 12px rgba(79, 70, 229, 0.3);
+        }
+        .top-bar h1 { font-size: 20px; font-weight: 600; }
+        .top-bar .sub { font-size: 13px; opacity: 0.85; }
+        .top-bar .status {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 12px; opacity: 0.9;
+        }
+        .top-bar .status .dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: #34d399; animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+        /* ========== 主体布局：左指引 + 右内容 ========== */
+        .layout {
+            display: flex;
+            max-width: 1340px;
             margin: 0 auto;
+            padding: 24px;
+            gap: 24px;
+            min-height: calc(100vh - 64px);
+        }
+
+        /* ========== 左侧步骤指引 ========== */
+        .guide-panel {
+            width: 260px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 88px;
+            align-self: flex-start;
+        }
+
+        .guide-card {
             background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
             overflow: hidden;
         }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+        .guide-card .guide-header {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
             color: white;
-            padding: 30px;
-            text-align: center;
+            padding: 16px;
+            font-size: 15px;
+            font-weight: 600;
         }
-        
-        .header h1 {
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-        
-        .header p {
-            opacity: 0.9;
-            font-size: 14px;
-        }
-        
-        .tabs {
+
+        .guide-steps { padding: 8px 0; }
+
+        .guide-step {
             display: flex;
-            background: #f5f5f5;
-            border-bottom: 1px solid #ddd;
-        }
-        
-        .tab {
-            flex: 1;
-            padding: 15px 20px;
-            text-align: center;
+            gap: 12px;
+            padding: 14px 16px;
             cursor: pointer;
-            font-weight: 500;
-            color: #666;
-            transition: all 0.3s;
-            border-bottom: 3px solid transparent;
+            transition: background .2s;
+            border-left: 3px solid transparent;
         }
-        
-        .tab:hover {
-            background: #eee;
+        .guide-step:hover { background: #f5f3ff; }
+        .guide-step.active {
+            background: #ede9fe;
+            border-left-color: #4f46e5;
         }
-        
-        .tab.active {
-            background: white;
-            color: #667eea;
-            border-bottom-color: #667eea;
+
+        .step-num {
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            color: #6b7280;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: 700;
+            flex-shrink: 0;
+            transition: all .3s;
         }
-        
-        .content {
-            padding: 30px;
+        .guide-step.active .step-num {
+            background: #4f46e5;
+            color: white;
         }
-        
-        .tab-content {
-            display: none;
+
+        .step-text { font-size: 13px; color: #374151; line-height: 1.5; }
+        .step-text .title { font-weight: 600; display: block; margin-bottom: 2px; }
+        .step-text .desc { font-size: 11px; color: #9ca3af; }
+
+        /* 提示小卡片 */
+        .tip-card {
+            margin-top: 16px;
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: 10px;
+            padding: 14px;
+            font-size: 12px;
+            color: #92400e;
+            line-height: 1.6;
         }
-        
-        .tab-content.active {
-            display: block;
+        .tip-card .tip-title {
+            font-weight: 700;
+            margin-bottom: 6px;
+            font-size: 13px;
         }
-        
-        .form-section {
-            margin-bottom: 30px;
-        }
-        
-        .form-section h3 {
-            color: #333;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #667eea;
-            display: inline-block;
-        }
-        
-        .form-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
+
+        /* ========== 右侧主内容 ========== */
+        .main-area { flex: 1; min-width: 0; }
+
+        /* Tab 切换 */
+        .type-tabs {
+            display: flex;
+            gap: 12px;
             margin-bottom: 20px;
         }
-        
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .form-group label {
+        .type-tab {
+            flex: 1;
+            padding: 14px 16px;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 14px;
             font-weight: 500;
-            color: #555;
-            margin-bottom: 8px;
-            font-size: 14px;
+            color: #6b7280;
+            transition: all .25s;
         }
-        
+        .type-tab:hover { border-color: #a5b4fc; }
+        .type-tab.active {
+            border-color: #4f46e5;
+            background: #f5f3ff;
+            color: #4f46e5;
+            font-weight: 600;
+        }
+        .type-tab .tab-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+
+        /* 区块卡片 */
+        .section-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .section-card .section-head {
+            padding: 16px 20px;
+            border-bottom: 1px solid #f3f4f6;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-card .section-head .sec-num {
+            width: 24px; height: 24px;
+            border-radius: 6px;
+            background: #4f46e5;
+            color: white;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700;
+        }
+        .section-card .section-head h3 { font-size: 15px; color: #1f2937; }
+        .section-card .section-head .sec-hint {
+            margin-left: auto;
+            font-size: 12px; color: #9ca3af;
+        }
+        .section-body { padding: 20px; }
+
+        /* 表单 */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label {
+            font-size: 13px; font-weight: 500; color: #4b5563;
+            margin-bottom: 6px;
+        }
+        .form-group label .req { color: #ef4444; }
         .form-group input,
-        .form-group select,
-        .form-group textarea {
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
+        .form-group select {
+            padding: 10px 12px;
+            border: 1.5px solid #d1d5db;
             border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.3s;
+            font-size: 13px;
+            transition: all .2s;
+            background: #fafafa;
         }
-        
         .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-            border-color: #667eea;
+        .form-group select:focus {
+            border-color: #4f46e5;
             outline: none;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
         }
-        
-        .image-upload {
-            border: 2px dashed #ccc;
-            border-radius: 8px;
+
+        /* 图片上传 */
+        .img-upload-area {
+            grid-column: span 2;
+            border: 2px dashed #d1d5db;
+            border-radius: 10px;
             padding: 20px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s;
-            min-height: 120px;
+            transition: all .25s;
+            position: relative;
+            min-height: 100px;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
+            gap: 16px;
         }
-        
-        .image-upload:hover {
-            border-color: #667eea;
-            background: #f8f9ff;
+        .img-upload-area:hover { border-color: #4f46e5; background: #fafaff; }
+        .img-upload-area input[type="file"] { display: none; }
+        .img-upload-area .upload-placeholder { color: #9ca3af; font-size: 13px; }
+        .img-upload-area .upload-placeholder .big-icon { font-size: 32px; margin-bottom: 4px; }
+        .img-preview-thumb {
+            max-height: 80px; max-width: 160px;
+            border-radius: 6px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.12);
         }
-        
-        .image-upload input {
-            display: none;
+
+        /* 添加按钮（紧贴表单末尾） */
+        .form-action {
+            display: flex;
+            justify-content: flex-end;
+            padding: 0 20px 20px;
         }
-        
-        .image-upload .icon {
-            font-size: 40px;
-            color: #ccc;
-            margin-bottom: 10px;
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 10px 20px;
+            border: none; border-radius: 8px;
+            cursor: pointer; font-size: 13px; font-weight: 500;
+            transition: all .25s;
         }
-        
-        .image-upload p {
-            color: #888;
-            font-size: 13px;
+        .btn:active { transform: scale(0.97); }
+        .btn-add {
+            background: #4f46e5; color: white;
+            box-shadow: 0 2px 8px rgba(79,70,229,0.3);
         }
-        
-        .image-preview {
-            max-width: 200px;
-            max-height: 150px;
-            margin-top: 10px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        .btn-add:hover { background: #4338ca; box-shadow: 0 4px 14px rgba(79,70,229,0.4); }
+        .btn-save { background: #059669; color: white; }
+        .btn-save:hover { background: #047857; }
+        .btn-export { background: #2563eb; color: white; }
+        .btn-export:hover { background: #1d4ed8; }
+        .btn-load { background: #6b7280; color: white; }
+        .btn-load:hover { background: #4b5563; }
+        .btn-clear { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+        .btn-clear:hover { background: #fee2e2; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+
+        /* ========== 记录表格区 ========== */
+        .records-wrap {
+            overflow-x: auto;
         }
-        
         .records-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-size: 13px;
         }
-        
-        .records-table th {
-            background: #667eea;
-            color: white;
-            padding: 12px 15px;
+        .records-table thead th {
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+            padding: 10px 12px;
             text-align: left;
-            font-weight: 500;
-            font-size: 13px;
+            border-bottom: 2px solid #e2e8f0;
+            white-space: nowrap;
         }
-        
-        .records-table td {
-            padding: 12px 15px;
-            border-bottom: 1px solid #eee;
-            font-size: 13px;
+        .records-table tbody td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
         }
-        
-        .records-table tr:hover {
-            background: #f8f9ff;
+        .records-table tbody tr:hover { background: #f8fafc; }
+        .records-table .amount { color: #dc2626; font-weight: 700; white-space: nowrap; }
+        .img-cell img {
+            width: 60px; height: 45px; object-fit: cover;
+            border-radius: 4px; cursor: pointer;
+            border: 1px solid #e5e7eb;
         }
-        
-        .records-table .actions {
-            display: flex;
-            gap: 8px;
+        .img-cell img:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .records-table tfoot td {
+            font-weight: 700; padding: 12px;
+            background: #f8fafc; border-top: 2px solid #e2e8f0;
         }
-        
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.3s;
-            font-size: 14px;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-        }
-        
-        .btn-success {
-            background: #10b981;
-            color: white;
-        }
-        
-        .btn-success:hover {
-            background: #059669;
-        }
-        
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-            padding: 6px 12px;
-            font-size: 12px;
-        }
-        
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-        
-        .btn-secondary {
-            background: #6b7280;
-            color: white;
-        }
-        
-        .btn-secondary:hover {
-            background: #4b5563;
-        }
-        
-        .btn-group {
-            display: flex;
-            gap: 15px;
-            margin-top: 30px;
-            justify-content: center;
-        }
-        
-        .summary {
-            background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
-            padding: 20px;
-            border-radius: 12px;
-            margin-top: 30px;
-        }
-        
-        .summary h4 {
-            color: #333;
-            margin-bottom: 15px;
-        }
-        
-        .summary-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px dashed #ddd;
-        }
-        
-        .summary-row:last-child {
-            border-bottom: none;
-            font-weight: bold;
-            color: #667eea;
-        }
-        
         .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: #888;
+            text-align: center; padding: 36px; color: #9ca3af;
         }
-        
-        .empty-state .icon {
-            font-size: 60px;
-            margin-bottom: 15px;
-        }
-        
-        .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            background: #10b981;
-            color: white;
-            border-radius: 8px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
-            transform: translateX(400px);
-            transition: transform 0.3s;
-            z-index: 1000;
-        }
-        
-        .toast.show {
-            transform: translateX(0);
-        }
-        
-        .toast.error {
-            background: #ef4444;
-        }
-        
-        .image-cell {
-            max-width: 100px;
-        }
-        
-        .image-cell img {
-            max-width: 80px;
-            max-height: 60px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        
-        .image-cell img:hover {
-            transform: scale(1.1);
-        }
-        
-        /* Modal for image preview */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .modal.show {
+        .empty-state .empty-icon { font-size: 40px; margin-bottom: 8px; }
+
+        /* ========== 底部操作区 ========== */
+        .bottom-actions {
             display: flex;
-        }
-        
-        .modal img {
-            max-width: 90%;
-            max-height: 90%;
-            border-radius: 8px;
-        }
-        
-        .modal-close {
-            position: absolute;
-            top: 20px;
-            right: 30px;
-            color: white;
-            font-size: 40px;
-            cursor: pointer;
-        }
-        
-        .footer {
-            text-align: center;
-            padding: 20px;
-            background: #f5f5f5;
-            color: #888;
-            font-size: 12px;
-        }
-        
-        .server-status {
-            display: inline-flex;
             align-items: center;
-            gap: 8px;
-            padding: 5px 12px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 20px;
-            font-size: 12px;
-            margin-top: 10px;
+            gap: 12px;
+            padding: 16px 20px;
+            border-top: 1px solid #f3f4f6;
+            background: #fafafa;
+            flex-wrap: wrap;
         }
-        
-        .server-status .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #10b981;
-            animation: pulse 2s infinite;
+        .bottom-actions .action-group {
+            display: flex; align-items: center; gap: 8px;
         }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        .bottom-actions .action-group .ag-label {
+            font-size: 12px; color: #6b7280; font-weight: 600;
+            white-space: nowrap;
+        }
+        .bottom-actions .action-group .ag-num {
+            width: 20px; height: 20px; border-radius: 50%;
+            background: #4f46e5; color: white;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 700; margin-right: 2px;
+        }
+        .bottom-actions .divider {
+            width: 1px; height: 28px; background: #e5e7eb; margin: 0 6px;
+        }
+
+        /* ========== Toast ========== */
+        .toast {
+            position: fixed; top: 80px; right: 24px;
+            padding: 12px 20px; border-radius: 8px;
+            color: white; font-size: 13px; font-weight: 500;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            transform: translateX(400px); transition: transform .3s;
+            z-index: 1000;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast.error { background: #ef4444; }
+        .toast:not(.error) { background: #059669; }
+
+        /* ========== 图片弹窗 ========== */
+        .modal {
+            display: none; position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75); z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+        .modal.show { display: flex; }
+        .modal img { max-width: 90%; max-height: 90%; border-radius: 8px; }
+        .modal-close {
+            position: absolute; top: 16px; right: 24px;
+            color: white; font-size: 36px; cursor: pointer;
+        }
+
+        /* ========== Tab内容切换 ========== */
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* 响应式 */
+        @media (max-width: 900px) {
+            .layout { flex-direction: column; }
+            .guide-panel { width: 100%; position: static; }
+            .guide-steps { display: flex; gap: 0; }
+            .guide-step { flex: 1; flex-direction: column; align-items: center; text-align: center; padding: 12px 8px; border-left: none; border-bottom: 3px solid transparent; }
+            .guide-step.active { border-bottom-color: #4f46e5; border-left-color: transparent; }
+            .tip-card { display: none; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>💰 报销费用填写工具</h1>
-            <p>快速填写报销信息，导出Excel表格给财务（支持图片嵌入）</p>
-            <div class="server-status">
-                <span class="dot"></span>
-                <span>本地服务器运行中</span>
+
+<!-- ===== 顶部栏 ===== -->
+<div class="top-bar">
+    <div>
+        <h1>💰 报销费用填写工具</h1>
+        <div class="sub">快速录入 → 保存 → 导出带图片的Excel给财务</div>
+    </div>
+    <div class="status"><span class="dot"></span> 本地服务运行中</div>
+</div>
+
+<!-- ===== 主体 ===== -->
+<div class="layout">
+
+    <!-- 左侧步骤指引 -->
+    <div class="guide-panel">
+        <div class="guide-card">
+            <div class="guide-header">📖 操作指南</div>
+            <div class="guide-steps">
+                <div class="guide-step active" id="gs-1" onclick="scrollToSection('section-form')">
+                    <div class="step-num">1</div>
+                    <div class="step-text">
+                        <span class="title">填写信息</span>
+                        <span class="desc">填好字段，上传截图，点击「添加记录」</span>
+                    </div>
+                </div>
+                <div class="guide-step" id="gs-2" onclick="scrollToSection('section-records')">
+                    <div class="step-num">2</div>
+                    <div class="step-text">
+                        <span class="title">检查记录</span>
+                        <span class="desc">在列表中核对，可删除错误记录</span>
+                    </div>
+                </div>
+                <div class="guide-step" id="gs-3" onclick="scrollToSection('section-actions')">
+                    <div class="step-num">3</div>
+                    <div class="step-text">
+                        <span class="title">保存数据</span>
+                        <span class="desc">点击保存，防止数据丢失</span>
+                    </div>
+                </div>
+                <div class="guide-step" id="gs-4" onclick="scrollToSection('section-actions')">
+                    <div class="step-num">4</div>
+                    <div class="step-text">
+                        <span class="title">导出Excel</span>
+                        <span class="desc">一键导出，图片自动嵌入表格</span>
+                    </div>
+                </div>
             </div>
         </div>
-        
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab('expense')">📋 费用模板（不计入销售成本）</div>
-            <div class="tab" onclick="switchTab('reimburse')">🧾 报销模板（计入销售订单成本）</div>
+
+        <div class="tip-card">
+            <div class="tip-title">💡 小贴士</div>
+            填写完每条记录后记得点「添加记录」，<br>
+            数据不会自动保存。<br><br>
+            也可以先加完所有记录，<br>
+            最后一起保存和导出。
         </div>
-        
-        <div class="content">
-            <!-- 费用模板 -->
-            <div id="expense-tab" class="tab-content active">
-                <div class="form-section">
-                    <h3>添加费用记录</h3>
-                    <div class="form-row">
+    </div>
+
+    <!-- 右侧主内容 -->
+    <div class="main-area">
+
+        <!-- 类型切换 -->
+        <div class="type-tabs">
+            <div class="type-tab active" id="type-tab-expense" onclick="switchType('expense')">
+                <span class="tab-icon">📋</span>
+                费用模板（不计入销售成本）
+            </div>
+            <div class="type-tab" id="type-tab-reimburse" onclick="switchType('reimburse')">
+                <span class="tab-icon">🧾</span>
+                报销模板（计入销售订单成本）
+            </div>
+        </div>
+
+        <!-- ===== 费用面板 ===== -->
+        <div class="tab-panel active" id="panel-expense">
+
+            <!-- 区块1：填写表单 -->
+            <div class="section-card" id="section-form">
+                <div class="section-head">
+                    <div class="sec-num">1</div>
+                    <h3>填写费用信息</h3>
+                    <span class="sec-hint">带 <span style="color:#ef4444">*</span> 为必填</span>
+                </div>
+                <div class="section-body">
+                    <div class="form-grid">
                         <div class="form-group">
-                            <label>时间 *</label>
-                            <input type="date" id="expense-time">
+                            <label>时间 <span class="req">*</span></label>
+                            <input type="date" id="e-time">
                         </div>
                         <div class="form-group">
-                            <label>产品（购买的物品、服务）*</label>
-                            <input type="text" id="expense-product" placeholder="例如：办公用品、交通费">
+                            <label>产品（购买的物品、服务）<span class="req">*</span></label>
+                            <input type="text" id="e-product" placeholder="如：办公用品、交通费">
                         </div>
                         <div class="form-group">
                             <label>关联项目</label>
-                            <input type="text" id="expense-project" placeholder="可选">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>发生原因 *</label>
-                            <input type="text" id="expense-reason" placeholder="例如：日常办公、出差">
+                            <input type="text" id="e-project" placeholder="选填">
                         </div>
                         <div class="form-group">
-                            <label>金额（元）*</label>
-                            <input type="number" id="expense-amount" placeholder="0.00" step="0.01" min="0">
+                            <label>发生原因 <span class="req">*</span></label>
+                            <input type="text" id="e-reason" placeholder="如：日常办公、出差">
+                        </div>
+                        <div class="form-group">
+                            <label>金额（元）<span class="req">*</span></label>
+                            <input type="number" id="e-amount" placeholder="0.00" step="0.01" min="0">
                         </div>
                         <div class="form-group">
                             <label>是否有票</label>
-                            <select id="expense-has-ticket">
+                            <select id="e-ticket">
                                 <option value="有票">有票</option>
                                 <option value="无票">无票</option>
                                 <option value="替票">替票</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="form-row">
                         <div class="form-group">
                             <label>开票主体</label>
-                            <input type="text" id="expense-ticket-entity" placeholder="可选">
+                            <input type="text" id="e-entity" placeholder="选填">
                         </div>
-                        <div class="form-group">
-                            <label>详情截图</label>
-                            <div class="image-upload" onclick="document.getElementById('expense-image').click()">
-                                <input type="file" id="expense-image" accept="image/*" onchange="previewImage(this, 'expense-preview')">
-                                <div class="icon">📷</div>
-                                <p>点击上传图片</p>
-                                <img id="expense-preview" class="image-preview" style="display:none">
+                        <div class="img-upload-area" onclick="document.getElementById('e-img').click()">
+                            <input type="file" id="e-img" accept="image/*" onchange="previewImg(this,'e-preview',this.parentElement)">
+                            <div class="upload-placeholder" id="e-placeholder">
+                                <div class="big-icon">📷</div>
+                                <div>点击上传凭证截图</div>
                             </div>
+                            <img class="img-preview-thumb" id="e-preview" style="display:none">
                         </div>
-                    </div>
-                    <div class="btn-group" style="justify-content: flex-start;">
-                        <button class="btn btn-primary" onclick="addRecord('expense')">➕ 添加记录</button>
                     </div>
                 </div>
-                
-                <div class="form-section">
-                    <h3>费用记录列表</h3>
-                    <div id="expense-records"></div>
-                    <div id="expense-summary" class="summary" style="display:none"></div>
+                <div class="form-action">
+                    <button class="btn btn-add" onclick="addRecord('expense')">➕ 添加记录</button>
                 </div>
             </div>
-            
-            <!-- 报销模板 -->
-            <div id="reimburse-tab" class="tab-content">
-                <div class="form-section">
-                    <h3>添加报销记录</h3>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>时间 *</label>
-                            <input type="date" id="reimburse-time">
-                        </div>
-                        <div class="form-group">
-                            <label>产品（购买的物品、服务）*</label>
-                            <input type="text" id="reimburse-product" placeholder="例如：客户礼品、招待费">
-                        </div>
-                        <div class="form-group">
-                            <label>关联客户 *</label>
-                            <input type="text" id="reimburse-customer" placeholder="客户名称">
+
+            <!-- 区块2：记录列表 -->
+            <div class="section-card" id="section-records">
+                <div class="section-head">
+                    <div class="sec-num">2</div>
+                    <h3>已添加的记录</h3>
+                    <span class="sec-hint" id="e-count">共 0 条</span>
+                </div>
+                <div class="section-body">
+                    <div class="records-wrap" id="e-records">
+                        <div class="empty-state">
+                            <div class="empty-icon">📭</div>
+                            <div>暂无记录，请在上方填写信息后点击「添加记录」</div>
                         </div>
                     </div>
-                    <div class="form-row">
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 报销面板 ===== -->
+        <div class="tab-panel" id="panel-reimburse">
+
+            <div class="section-card">
+                <div class="section-head">
+                    <div class="sec-num">1</div>
+                    <h3>填写报销信息</h3>
+                    <span class="sec-hint">带 <span style="color:#ef4444">*</span> 为必填</span>
+                </div>
+                <div class="section-body">
+                    <div class="form-grid">
                         <div class="form-group">
-                            <label>发生原因 *</label>
-                            <input type="text" id="reimburse-reason" placeholder="例如：客户拜访、项目合作">
+                            <label>时间 <span class="req">*</span></label>
+                            <input type="date" id="r-time">
                         </div>
                         <div class="form-group">
-                            <label>金额（元）*</label>
-                            <input type="number" id="reimburse-amount" placeholder="0.00" step="0.01" min="0">
+                            <label>产品（购买的物品、服务）<span class="req">*</span></label>
+                            <input type="text" id="r-product" placeholder="如：客户礼品、招待费">
+                        </div>
+                        <div class="form-group">
+                            <label>关联客户 <span class="req">*</span></label>
+                            <input type="text" id="r-customer" placeholder="客户名称">
+                        </div>
+                        <div class="form-group">
+                            <label>发生原因 <span class="req">*</span></label>
+                            <input type="text" id="r-reason" placeholder="如：客户拜访、项目合作">
+                        </div>
+                        <div class="form-group">
+                            <label>金额（元）<span class="req">*</span></label>
+                            <input type="number" id="r-amount" placeholder="0.00" step="0.01" min="0">
                         </div>
                         <div class="form-group">
                             <label>是否有票</label>
-                            <select id="reimburse-has-ticket">
+                            <select id="r-ticket">
                                 <option value="有票">有票</option>
                                 <option value="无票">无票</option>
                                 <option value="替票">替票</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="form-row">
                         <div class="form-group">
                             <label>开票主体</label>
-                            <input type="text" id="reimburse-ticket-entity" placeholder="可选">
+                            <input type="text" id="r-entity" placeholder="选填">
                         </div>
-                        <div class="form-group">
-                            <label>详情截图</label>
-                            <div class="image-upload" onclick="document.getElementById('reimburse-image').click()">
-                                <input type="file" id="reimburse-image" accept="image/*" onchange="previewImage(this, 'reimburse-preview')">
-                                <div class="icon">📷</div>
-                                <p>点击上传图片</p>
-                                <img id="reimburse-preview" class="image-preview" style="display:none">
+                        <div class="img-upload-area" onclick="document.getElementById('r-img').click()">
+                            <input type="file" id="r-img" accept="image/*" onchange="previewImg(this,'r-preview',this.parentElement)">
+                            <div class="upload-placeholder" id="r-placeholder">
+                                <div class="big-icon">📷</div>
+                                <div>点击上传凭证截图</div>
                             </div>
+                            <img class="img-preview-thumb" id="r-preview" style="display:none">
                         </div>
                     </div>
-                    <div class="btn-group" style="justify-content: flex-start;">
-                        <button class="btn btn-primary" onclick="addRecord('reimburse')">➕ 添加记录</button>
+                </div>
+                <div class="form-action">
+                    <button class="btn btn-add" onclick="addRecord('reimburse')">➕ 添加记录</button>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-head">
+                    <div class="sec-num">2</div>
+                    <h3>已添加的记录</h3>
+                    <span class="sec-hint" id="r-count">共 0 条</span>
+                </div>
+                <div class="section-body">
+                    <div class="records-wrap" id="r-records">
+                        <div class="empty-state">
+                            <div class="empty-icon">📭</div>
+                            <div>暂无记录，请在上方填写信息后点击「添加记录」</div>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="form-section">
-                    <h3>报销记录列表</h3>
-                    <div id="reimburse-records"></div>
-                    <div id="reimburse-summary" class="summary" style="display:none"></div>
+            </div>
+        </div>
+
+        <!-- ===== 底部操作区 ===== -->
+        <div class="section-card" id="section-actions">
+            <div class="bottom-actions">
+                <div class="action-group">
+                    <span class="ag-num">3</span>
+                    <span class="ag-label">数据存取</span>
+                    <button class="btn btn-save" onclick="saveToServer()">💾 保存数据</button>
+                    <button class="btn btn-load" onclick="loadFromServer()">📂 重新加载</button>
+                </div>
+                <div class="divider"></div>
+                <div class="action-group">
+                    <span class="ag-num">4</span>
+                    <span class="ag-label">导出表格</span>
+                    <button class="btn btn-export" onclick="exportToExcel()">📊 导出Excel（含图片）</button>
+                </div>
+                <div class="divider"></div>
+                <div class="action-group">
+                    <button class="btn btn-clear" onclick="clearAll()">🗑️ 清空所有</button>
                 </div>
             </div>
-            
-            <div class="btn-group">
-                <button class="btn btn-success" onclick="exportToExcel()">📊 导出Excel（含图片）</button>
-                <button class="btn btn-secondary" onclick="saveToServer()">💾 保存数据</button>
-                <button class="btn btn-secondary" onclick="loadFromServer()">📂 加载数据</button>
-                <button class="btn btn-danger" onclick="clearAll()">🗑️ 清空所有</button>
-            </div>
         </div>
-        
-        <div class="footer">
-            报销费用填写工具 v2.0 | 支持图片嵌入Excel | 数据保存在本地服务器
-        </div>
-    </div>
-    
-    <div class="modal" id="image-modal" onclick="this.classList.remove('show')">
-        <span class="modal-close">&times;</span>
-        <img id="modal-image" src="">
-    </div>
-    
-    <div class="toast" id="toast"></div>
-    
-    <script>
-        // 数据存储
-        let expenseRecords = [];
-        let reimburseRecords = [];
-        
-        // API基础地址
-        const API_BASE = 'http://localhost:8765';
-        
-        // 初始化
-        document.addEventListener('DOMContentLoaded', () => {
-            // 设置默认日期为今天
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('expense-time').value = today;
-            document.getElementById('reimburse-time').value = today;
-            
-            // 尝试从服务器加载数据
-            loadFromServer();
-        });
-        
-        // 切换标签页
-        function switchTab(type) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            
-            event.target.classList.add('active');
-            document.getElementById(`${type}-tab`).classList.add('active');
-        }
-        
-        // 预览图片
-        function previewImage(input, previewId) {
-            const preview = document.getElementById(previewId);
-            const uploadDiv = input.parentElement;
-            
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    preview.src = e.target.result;
-                    preview.style.display = 'block';
-                    uploadDiv.querySelector('.icon').style.display = 'none';
-                    uploadDiv.querySelector('p').style.display = 'none';
-                };
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-        
-        // 添加记录
-        function addRecord(type) {
-            const prefix = type;
-            const time = document.getElementById(`${prefix}-time`).value;
-            const product = document.getElementById(`${prefix}-product`).value;
-            const reason = document.getElementById(`${prefix}-reason`).value;
-            const amount = document.getElementById(`${prefix}-amount`).value;
-            const hasTicket = document.getElementById(`${prefix}-has-ticket`).value;
-            const ticketEntity = document.getElementById(`${prefix}-ticket-entity`).value;
-            const imageInput = document.getElementById(`${prefix}-image`);
-            
-            // 验证必填字段
-            if (!time || !product || !reason || !amount) {
-                showToast('请填写所有必填字段（带*号）', true);
-                return;
-            }
-            
-            // 获取关联字段
-            let relatedField = '';
-            if (type === 'expense') {
-                relatedField = document.getElementById('expense-project').value;
-            } else {
-                relatedField = document.getElementById('reimburse-customer').value;
-            }
-            
-            // 处理图片
-            let imgData = null;
-            if (imageInput.files && imageInput.files[0]) {
-                imgData = document.getElementById(`${prefix}-preview`).src;
-            }
-            
-            // 创建记录
-            const record = {
-                id: Date.now(),
-                time,
-                product,
-                related: relatedField,
-                reason,
-                amount: parseFloat(amount),
-                hasTicket,
-                ticketEntity,
-                image: imgData
+
+    </div><!-- /main-area -->
+</div><!-- /layout -->
+
+<!-- 图片弹窗 -->
+<div class="modal" id="img-modal" onclick="this.classList.remove('show')">
+    <span class="modal-close">&times;</span>
+    <img id="modal-img" src="">
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+    /* ====== 数据 ====== */
+    let expenseRecords = [];
+    let reimburseRecords = [];
+    let currentType = 'expense';
+    const API = 'http://localhost:8765';
+
+    /* ====== 初始化 ====== */
+    document.addEventListener('DOMContentLoaded', () => {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('e-time').value = today;
+        document.getElementById('r-time').value = today;
+        loadFromServer();
+    });
+
+    /* ====== 切换费用/报销 ====== */
+    function switchType(type) {
+        currentType = type;
+        document.querySelectorAll('.type-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('type-tab-' + type).classList.add('active');
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById('panel-' + type).classList.add('active');
+    }
+
+    /* ====== 图片预览 ====== */
+    function previewImg(input, previewId, areaEl) {
+        const preview = document.getElementById(previewId);
+        const placeholder = areaEl.querySelector('.upload-placeholder');
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+                placeholder.style.display = 'none';
             };
-            
-            // 添加到对应数组
-            if (type === 'expense') {
-                expenseRecords.push(record);
-            } else {
-                reimburseRecords.push(record);
-            }
-            
-            // 清空表单
-            clearForm(type);
-            
-            // 更新显示
-            renderRecords(type);
-            
-            showToast('记录添加成功！');
+            reader.readAsDataURL(input.files[0]);
         }
-        
-        // 清空表单
-        function clearForm(type) {
-            const prefix = type;
-            const today = new Date().toISOString().split('T')[0];
-            
-            document.getElementById(`${prefix}-time`).value = today;
-            document.getElementById(`${prefix}-product`).value = '';
-            document.getElementById(`${prefix}-reason`).value = '';
-            document.getElementById(`${prefix}-amount`).value = '';
-            document.getElementById(`${prefix}-ticket-entity`).value = '';
-            
-            if (type === 'expense') {
-                document.getElementById('expense-project').value = '';
-            } else {
-                document.getElementById('reimburse-customer').value = '';
-            }
-            
-            // 重置图片
-            const preview = document.getElementById(`${prefix}-preview`);
-            preview.style.display = 'none';
-            preview.src = '';
-            const uploadDiv = document.getElementById(`${prefix}-image`).parentElement;
-            uploadDiv.querySelector('.icon').style.display = 'block';
-            uploadDiv.querySelector('p').style.display = 'block';
-            document.getElementById(`${prefix}-image`).value = '';
+    }
+
+    /* ====== 添加记录 ====== */
+    function addRecord(type) {
+        const p = type === 'expense' ? 'e' : 'r';
+        const time = document.getElementById(p + '-time').value;
+        const product = document.getElementById(p + '-product').value;
+        const reason = document.getElementById(p + '-reason').value;
+        const amount = document.getElementById(p + '-amount').value;
+
+        if (!time || !product || !reason || !amount) {
+            showToast('请填写所有带 * 的必填字段', true); return;
         }
-        
-        // 渲染记录列表
-        function renderRecords(type) {
-            const records = type === 'expense' ? expenseRecords : reimburseRecords;
-            const container = document.getElementById(`${type}-records`);
-            const summaryDiv = document.getElementById(`${type}-summary`);
-            
-            if (records.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="icon">📭</div>
-                        <p>暂无记录，请添加${type === 'expense' ? '费用' : '报销'}记录</p>
-                    </div>
-                `;
-                summaryDiv.style.display = 'none';
-                return;
-            }
-            
-            const relatedLabel = type === 'expense' ? '关联项目' : '关联客户';
-            
-            let html = `
-                <table class="records-table">
-                    <thead>
-                        <tr>
-                            <th>时间</th>
-                            <th>产品</th>
-                            <th>${relatedLabel}</th>
-                            <th>发生原因</th>
-                            <th>金额</th>
-                            <th>截图</th>
-                            <th>是否有票</th>
-                            <th>开票主体</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
-            let total = 0;
-            records.forEach((record, index) => {
-                total += record.amount;
-                const imgCell = record.image 
-                    ? `<div class="image-cell"><img src="${record.image}" onclick="showImageModal('${record.image}')"></div>`
-                    : '-';
-                
-                html += `
-                    <tr>
-                        <td>${record.time}</td>
-                        <td>${record.product}</td>
-                        <td>${record.related || '-'}</td>
-                        <td>${record.reason}</td>
-                        <td style="color: #e74c3c; font-weight: bold;">¥${record.amount.toFixed(2)}</td>
-                        <td>${imgCell}</td>
-                        <td>${record.hasTicket}</td>
-                        <td>${record.ticketEntity || '-'}</td>
-                        <td>
-                            <div class="actions">
-                                <button class="btn btn-danger" onclick="deleteRecord('${type}', ${index})">删除</button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+
+        const related = type === 'expense'
+            ? document.getElementById('e-project').value
+            : document.getElementById('r-customer').value;
+
+        const imgEl = document.getElementById(p + '-preview');
+        const image = imgEl.style.display !== 'none' ? imgEl.src : null;
+
+        const record = {
+            id: Date.now(), time, product,
+            related, reason,
+            amount: parseFloat(amount),
+            hasTicket: document.getElementById(p + '-ticket').value,
+            ticketEntity: document.getElementById(p + '-entity').value,
+            image
+        };
+
+        (type === 'expense' ? expenseRecords : reimburseRecords).push(record);
+        clearForm(type);
+        renderRecords(type);
+        highlightStep(2);
+        showToast('✅ 记录已添加');
+    }
+
+    /* ====== 清空表单 ====== */
+    function clearForm(type) {
+        const p = type === 'expense' ? 'e' : 'r';
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById(p + '-time').value = today;
+        document.getElementById(p + '-product').value = '';
+        document.getElementById(p + '-reason').value = '';
+        document.getElementById(p + '-amount').value = '';
+        document.getElementById(p + '-entity').value = '';
+        if (type === 'expense') document.getElementById('e-project').value = '';
+        else document.getElementById('r-customer').value = '';
+
+        const preview = document.getElementById(p + '-preview');
+        preview.style.display = 'none'; preview.src = '';
+        const placeholder = document.getElementById(p + '-placeholder');
+        placeholder.style.display = 'block';
+        document.getElementById(p + '-img').value = '';
+    }
+
+    /* ====== 渲染记录 ====== */
+    function renderRecords(type) {
+        const records = type === 'expense' ? expenseRecords : reimburseRecords;
+        const p = type === 'expense' ? 'e' : 'r';
+        const container = document.getElementById(p + '-records');
+        const countEl = document.getElementById(p + '-count');
+        countEl.textContent = '共 ' + records.length + ' 条';
+
+        if (records.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div>暂无记录，请在上方填写信息后点击「添加记录」</div></div>';
+            return;
+        }
+
+        const relatedLabel = type === 'expense' ? '关联项目' : '关联客户';
+        let total = 0;
+        let html = `<table class="records-table">
+            <thead><tr>
+                <th>时间</th><th>产品</th><th>${relatedLabel}</th>
+                <th>原因</th><th>金额</th><th>截图</th>
+                <th>有票</th><th>开票主体</th><th>操作</th>
+            </tr></thead><tbody>`;
+
+        records.forEach((r, i) => {
+            total += r.amount;
+            const imgHtml = r.image
+                ? `<div class="img-cell"><img src="${r.image}" onclick="showModal('${r.image}')"></div>`
+                : '<span style="color:#ccc">-</span>';
+            html += `<tr>
+                <td>${r.time}</td><td>${r.product}</td><td>${r.related||'-'}</td>
+                <td>${r.reason}</td>
+                <td class="amount">¥${r.amount.toFixed(2)}</td>
+                <td>${imgHtml}</td>
+                <td>${r.hasTicket}</td><td>${r.ticketEntity||'-'}</td>
+                <td><button class="btn btn-sm btn-clear" onclick="delRecord('${type}',${i})">删除</button></td>
+            </tr>`;
+        });
+
+        html += `</tbody><tfoot><tr>
+            <td colspan="4" style="text-align:right">合计：</td>
+            <td class="amount">¥${total.toFixed(2)}</td>
+            <td colspan="4"></td>
+        </tr></tfoot></table>`;
+        container.innerHTML = html;
+    }
+
+    /* ====== 删除记录 ====== */
+    function delRecord(type, idx) {
+        if (!confirm('确定删除这条记录？')) return;
+        (type === 'expense' ? expenseRecords : reimburseRecords).splice(idx, 1);
+        renderRecords(type);
+        showToast('记录已删除');
+    }
+
+    /* ====== 图片弹窗 ====== */
+    function showModal(src) {
+        document.getElementById('modal-img').src = src;
+        document.getElementById('img-modal').classList.add('show');
+    }
+
+    /* ====== 导出 ====== */
+    async function exportToExcel() {
+        if (expenseRecords.length === 0 && reimburseRecords.length === 0) {
+            showToast('没有数据可导出', true); return;
+        }
+        try {
+            const res = await fetch(API + '/api/export', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ expense: expenseRecords, reimburse: reimburseRecords })
             });
-            
-            html += `
-                    </tbody>
-                    <tfoot>
-                        <tr style="background: #f8f9ff; font-weight: bold;">
-                            <td colspan="4" style="text-align: right;">合计：</td>
-                            <td style="color: #e74c3c;">¥${total.toFixed(2)}</td>
-                            <td colspan="4"></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            `;
-            
-            container.innerHTML = html;
-            
-            // 显示汇总
-            summaryDiv.innerHTML = `
-                <h4>📊 费用汇总</h4>
-                <div class="summary-row">
-                    <span>记录数量</span>
-                    <span>${records.length} 条</span>
-                </div>
-                <div class="summary-row">
-                    <span>总金额</span>
-                    <span>¥${total.toFixed(2)}</span>
-                </div>
-            `;
-            summaryDiv.style.display = 'block';
-        }
-        
-        // 删除记录
-        function deleteRecord(type, index) {
-            if (!confirm('确定要删除这条记录吗？')) return;
-            
-            if (type === 'expense') {
-                expenseRecords.splice(index, 1);
+            const data = await res.json();
+            if (data.success) {
+                showToast('📄 导出成功：' + data.filename);
+                window.open(API + '/' + data.filename, '_blank');
+                highlightStep(4);
             } else {
-                reimburseRecords.splice(index, 1);
+                showToast('导出失败：' + data.error, true);
             }
-            
-            renderRecords(type);
-            showToast('记录已删除');
-        }
-        
-        // 显示图片模态框
-        function showImageModal(src) {
-            document.getElementById('modal-image').src = src;
-            document.getElementById('image-modal').classList.add('show');
-        }
-        
-        // 导出Excel（通过服务器API，支持图片嵌入）
-        async function exportToExcel() {
-            if (expenseRecords.length === 0 && reimburseRecords.length === 0) {
-                showToast('没有数据可导出', true);
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE}/api/export`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        expense: expenseRecords,
-                        reimburse: reimburseRecords
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    showToast(`Excel导出成功！文件：${result.filename}`);
-                    // 自动下载
-                    window.open(`${API_BASE}/${result.filename}`, '_blank');
-                } else {
-                    showToast('导出失败：' + result.error, true);
-                }
-            } catch (e) {
-                showToast('导出失败，请确保服务器正在运行', true);
-            }
-        }
-        
-        // 保存到服务器
-        async function saveToServer() {
-            try {
-                const response = await fetch(`${API_BASE}/api/save`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        expense: expenseRecords,
-                        reimburse: reimburseRecords
-                    })
-                });
-                
-                if (response.ok) {
-                    showToast('数据已保存到服务器');
-                } else {
-                    showToast('保存失败', true);
-                }
-            } catch (e) {
-                showToast('保存失败，请确保服务器正在运行', true);
-            }
-        }
-        
-        // 从服务器加载
-        async function loadFromServer() {
-            try {
-                const response = await fetch(`${API_BASE}/api/load`);
-                const data = await response.json();
-                
-                expenseRecords = data.expense || [];
-                reimburseRecords = data.reimburse || [];
-                
-                renderRecords('expense');
-                renderRecords('reimburse');
-                
-                if (expenseRecords.length > 0 || reimburseRecords.length > 0) {
-                    showToast(`已加载数据`);
-                }
-            } catch (e) {
-                console.log('服务器未运行或无数据');
-            }
-        }
-        
-        // 清空所有数据
-        function clearAll() {
-            if (!confirm('确定要清空所有数据吗？此操作不可恢复！')) return;
-            
-            expenseRecords = [];
-            reimburseRecords = [];
+        } catch (e) { showToast('导出失败，请检查服务器', true); }
+    }
+
+    /* ====== 保存 ====== */
+    async function saveToServer() {
+        try {
+            const res = await fetch(API + '/api/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ expense: expenseRecords, reimburse: reimburseRecords })
+            });
+            if (res.ok) { showToast('💾 数据已保存'); highlightStep(3); }
+            else showToast('保存失败', true);
+        } catch (e) { showToast('保存失败，请检查服务器', true); }
+    }
+
+    /* ====== 加载 ====== */
+    async function loadFromServer() {
+        try {
+            const res = await fetch(API + '/api/load');
+            const data = await res.json();
+            expenseRecords = data.expense || [];
+            reimburseRecords = data.reimburse || [];
             renderRecords('expense');
             renderRecords('reimburse');
-            showToast('所有数据已清空');
-        }
-        
-        // 显示提示
-        function showToast(message, isError = false) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.className = `toast show ${isError ? 'error' : ''}`;
-            
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
-        }
-    </script>
+            if (expenseRecords.length || reimburseRecords.length) showToast('📂 数据已加载');
+        } catch (e) { console.log('无历史数据'); }
+    }
+
+    /* ====== 清空 ====== */
+    function clearAll() {
+        if (!confirm('确定清空所有数据？此操作不可恢复！')) return;
+        expenseRecords = []; reimburseRecords = [];
+        renderRecords('expense'); renderRecords('reimburse');
+        showToast('已清空所有数据');
+    }
+
+    /* ====== 左侧步骤高亮 ====== */
+    function highlightStep(num) {
+        document.querySelectorAll('.guide-step').forEach(s => s.classList.remove('active'));
+        const el = document.getElementById('gs-' + num);
+        if (el) el.classList.add('active');
+    }
+
+    /* ====== 滚动到区块 ====== */
+    function scrollToSection(id) {
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const num = id === 'section-form' ? 1 : id === 'section-records' ? 2 : 3;
+        highlightStep(num);
+    }
+
+    /* ====== Toast ====== */
+    function showToast(msg, err) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast show' + (err ? ' error' : '');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+</script>
 </body>
 </html>
