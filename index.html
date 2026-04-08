@@ -644,7 +644,7 @@
     let expenseRecords = [];
     let reimburseRecords = [];
     let currentType = 'expense';
-    const API = 'http://localhost:8765';
+    const API = '';  // 同源部署，API 同页面
 
     /* ====== 初始化 ====== */
     document.addEventListener('DOMContentLoaded', () => {
@@ -805,7 +805,13 @@
             const data = await res.json();
             if (data.success) {
                 showToast('📄 导出成功：' + data.filename);
-                window.open(API + '/' + data.filename, '_blank');
+                // 用 a[download] 触发文件下载
+                const a = document.createElement('a');
+                a.href = data.download_url;
+                a.download = data.filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
                 highlightStep(4);
             } else {
                 showToast('导出失败：' + data.error, true);
