@@ -306,8 +306,11 @@ class APIHandler(SimpleHTTPRequestHandler):
         body = json.dumps(data, ensure_ascii=False).encode('utf-8')
         self.wfile.write(body)
 
-    def send_file(self, filepath, content_type=None):
-        """返回文件下载响应"""
+    def send_file(self, filepath, content_type=None, as_download=False):
+        """返回文件响应
+        - as_download=False : 让浏览器直接渲染（如HTML页面）
+        - as_download=True  : 弹出下载框（如Excel）
+        """
         filepath = Path(filepath)
         if not filepath.exists():
             self.send_error(404, 'File not found')
@@ -315,9 +318,10 @@ class APIHandler(SimpleHTTPRequestHandler):
         self.send_response(200)
         ct = content_type or 'application/octet-stream'
         self.send_header('Content-Type', ct)
-        # 中文文件名 RFC 5987 编码
-        safe_name = quote(filepath.name)
-        self.send_header('Content-Disposition', f'attachment; filename="{safe_name}"; filename*=UTF-8\'\'{safe_name}')
+        if as_download:
+            # 中文文件名 RFC 5987 编码，触发下载
+            safe_name = quote(filepath.name)
+            self.send_header('Content-Disposition', f'attachment; filename="{safe_name}"; filename*=UTF-8\'\'{safe_name}')
         self.send_header('Content-Length', filepath.stat().st_size)
         self.send_header('Cache-Control', 'no-cache')
         self._add_cors_headers()
@@ -361,10 +365,10 @@ class APIHandler(SimpleHTTPRequestHandler):
             self.send_json(load_data())
 
         elif path.startswith('/exports/'):
-            # 导出文件下载
+            # 导出文件下载（强制弹出保存窗口）
             filename = path.split('/')[-1]
             file_path = OUTPUT_DIR / filename
-            self.send_file(file_path)
+            self.send_file(file_path, as_download=True)
 
         elif path == '/api/config':
             # 返回配置（不包含敏感字段）
@@ -381,14 +385,15 @@ class APIHandler(SimpleHTTPRequestHandler):
                     ct = 'text/html; charset=utf-8'
                 elif path.endswith('.css'):
                     ct = 'text/css; charset=utf-8'
+                    self.send_file(str(file_path), content_type=ct)
                 elif path.endswith('.js'):
                     ct = 'application/javascript; charset=utf-8'
+                    self.send_file(str(file_path), content_type=ct)
                 else:
-                    ct = 'application/octet-stream'
-                self.send_file(str(file_path), content_type=ct)
+                    self.send_file(str(file_path))
             else:
-                # SPA fallback → index.html
-                self.send_file(str(BASE_DIR / 'index.html'), content_type='text/html; charset=utf-8')
+                # SPA fallback → index.html（不触发下载，直接在浏览器渲染）
+                self.send_file(str(BASE_DIR / 'index.html'), content_type='text/html; charset=utf-8', as_download=False)
 
     # ---- POST ----
     def do_POST(self):
