@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>报销费用填写工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .tabs {
+            display: flex;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 15px 20px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab:hover {
+            background: #eee;
+        }
+        
+        .tab.active {
+            background: white;
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .form-section {
+            margin-bottom: 30px;
+        }
+        
+        .form-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+            display: inline-block;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group label {
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .image-upload {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .image-upload:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .image-upload input {
+            display: none;
+        }
+        
+        .image-upload .icon {
+            font-size: 40px;
+            color: #ccc;
+            margin-bottom: 10px;
+        }
+        
+        .image-upload p {
+            color: #888;
+            font-size: 13px;
+        }
+        
+        .image-preview {
+            max-width: 200px;
+            max-height: 150px;
+            margin-top: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .records-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .records-table th {
+            background: #667eea;
+            color: white;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        
+        .records-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        
+        .records-table tr:hover {
+            background: #f8f9ff;
+        }
+        
+        .records-table .actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            justify-content: center;
+        }
+        
+        .summary {
+            background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 30px;
+        }
+        
+        .summary h4 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dashed #ddd;
+        }
+        
+        .summary-row:last-child {
+            border-bottom: none;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+        
+        .empty-state .icon {
+            font-size: 60px;
+            margin-bottom: 15px;
+        }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background: #10b981;
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            transform: translateX(400px);
+            transition: transform 0.3s;
+            z-index: 1000;
+        }
+        
+        .toast.show {
+            transform: translateX(0);
+        }
+        
+        .toast.error {
+            background: #ef4444;
+        }
+        
+        .image-cell {
+            max-width: 100px;
+        }
+        
+        .image-cell img {
+            max-width: 80px;
+            max-height: 60px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .image-cell img:hover {
+            transform: scale(1.1);
+        }
+        
+        /* Modal for image preview */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 8px;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #888;
+            font-size: 12px;
+        }
+        
+        .server-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 12px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        .server-status .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💰 报销费用填写工具</h1>
+            <p>快速填写报销信息，导出Excel表格给财务（支持图片嵌入）</p>
+            <div class="server-status">
+                <span class="dot"></span>
+                <span>本地服务器运行中</span>
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('expense')">📋 费用模板（不计入销售成本）</div>
+            <div class="tab" onclick="switchTab('reimburse')">🧾 报销模板（计入销售订单成本）</div>
+        </div>
+        
+        <div class="content">
+            <!-- 费用模板 -->
+            <div id="expense-tab" class="tab-content active">
+                <div class="form-section">
+                    <h3>添加费用记录</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>时间 *</label>
+                            <input type="date" id="expense-time">
+                        </div>
+                        <div class="form-group">
+                            <label>产品（购买的物品、服务）*</label>
+                            <input type="text" id="expense-product" placeholder="例如：办公用品、交通费">
+                        </div>
+                        <div class="form-group">
+                            <label>关联项目</label>
+                            <input type="text" id="expense-project" placeholder="可选">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>发生原因 *</label>
+                            <input type="text" id="expense-reason" placeholder="例如：日常办公、出差">
+                        </div>
+                        <div class="form-group">
+                            <label>金额（元）*</label>
+                            <input type="number" id="expense-amount" placeholder="0.00" step="0.01" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>是否有票</label>
+                            <select id="expense-has-ticket">
+                                <option value="有票">有票</option>
+                                <option value="无票">无票</option>
+                                <option value="替票">替票</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>开票主体</label>
+                            <input type="text" id="expense-ticket-entity" placeholder="可选">
+                        </div>
+                        <div class="form-group">
+                            <label>详情截图</label>
+                            <div class="image-upload" onclick="document.getElementById('expense-image').click()">
+                                <input type="file" id="expense-image" accept="image/*" onchange="previewImage(this, 'expense-preview')">
+                                <div class="icon">📷</div>
+                                <p>点击上传图片</p>
+                                <img id="expense-preview" class="image-preview" style="display:none">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="btn-group" style="justify-content: flex-start;">
+                        <button class="btn btn-primary" onclick="addRecord('expense')">➕ 添加记录</button>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h3>费用记录列表</h3>
+                    <div id="expense-records"></div>
+                    <div id="expense-summary" class="summary" style="display:none"></div>
+                </div>
+            </div>
+            
+            <!-- 报销模板 -->
+            <div id="reimburse-tab" class="tab-content">
+                <div class="form-section">
+                    <h3>添加报销记录</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>时间 *</label>
+                            <input type="date" id="reimburse-time">
+                        </div>
+                        <div class="form-group">
+                            <label>产品（购买的物品、服务）*</label>
+                            <input type="text" id="reimburse-product" placeholder="例如：客户礼品、招待费">
+                        </div>
+                        <div class="form-group">
+                            <label>关联客户 *</label>
+                            <input type="text" id="reimburse-customer" placeholder="客户名称">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>发生原因 *</label>
+                            <input type="text" id="reimburse-reason" placeholder="例如：客户拜访、项目合作">
+                        </div>
+                        <div class="form-group">
+                            <label>金额（元）*</label>
+                            <input type="number" id="reimburse-amount" placeholder="0.00" step="0.01" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>是否有票</label>
+                            <select id="reimburse-has-ticket">
+                                <option value="有票">有票</option>
+                                <option value="无票">无票</option>
+                                <option value="替票">替票</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>开票主体</label>
+                            <input type="text" id="reimburse-ticket-entity" placeholder="可选">
+                        </div>
+                        <div class="form-group">
+                            <label>详情截图</label>
+                            <div class="image-upload" onclick="document.getElementById('reimburse-image').click()">
+                                <input type="file" id="reimburse-image" accept="image/*" onchange="previewImage(this, 'reimburse-preview')">
+                                <div class="icon">📷</div>
+                                <p>点击上传图片</p>
+                                <img id="reimburse-preview" class="image-preview" style="display:none">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="btn-group" style="justify-content: flex-start;">
+                        <button class="btn btn-primary" onclick="addRecord('reimburse')">➕ 添加记录</button>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h3>报销记录列表</h3>
+                    <div id="reimburse-records"></div>
+                    <div id="reimburse-summary" class="summary" style="display:none"></div>
+                </div>
+            </div>
+            
+            <div class="btn-group">
+                <button class="btn btn-success" onclick="exportToExcel()">📊 导出Excel（含图片）</button>
+                <button class="btn btn-secondary" onclick="saveToServer()">💾 保存数据</button>
+                <button class="btn btn-secondary" onclick="loadFromServer()">📂 加载数据</button>
+                <button class="btn btn-danger" onclick="clearAll()">🗑️ 清空所有</button>
+            </div>
+        </div>
+        
+        <div class="footer">
+            报销费用填写工具 v2.0 | 支持图片嵌入Excel | 数据保存在本地服务器
+        </div>
+    </div>
+    
+    <div class="modal" id="image-modal" onclick="this.classList.remove('show')">
+        <span class="modal-close">&times;</span>
+        <img id="modal-image" src="">
+    </div>
+    
+    <div class="toast" id="toast"></div>
+    
+    <script>
+        // 数据存储
+        let expenseRecords = [];
+        let reimburseRecords = [];
+        
+        // API基础地址
+        const API_BASE = 'http://localhost:8765';
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 设置默认日期为今天
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('expense-time').value = today;
+            document.getElementById('reimburse-time').value = today;
+            
+            // 尝试从服务器加载数据
+            loadFromServer();
+        });
+        
+        // 切换标签页
+        function switchTab(type) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(`${type}-tab`).classList.add('active');
+        }
+        
+        // 预览图片
+        function previewImage(input, previewId) {
+            const preview = document.getElementById(previewId);
+            const uploadDiv = input.parentElement;
+            
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    uploadDiv.querySelector('.icon').style.display = 'none';
+                    uploadDiv.querySelector('p').style.display = 'none';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        
+        // 添加记录
+        function addRecord(type) {
+            const prefix = type;
+            const time = document.getElementById(`${prefix}-time`).value;
+            const product = document.getElementById(`${prefix}-product`).value;
+            const reason = document.getElementById(`${prefix}-reason`).value;
+            const amount = document.getElementById(`${prefix}-amount`).value;
+            const hasTicket = document.getElementById(`${prefix}-has-ticket`).value;
+            const ticketEntity = document.getElementById(`${prefix}-ticket-entity`).value;
+            const imageInput = document.getElementById(`${prefix}-image`);
+            
+            // 验证必填字段
+            if (!time || !product || !reason || !amount) {
+                showToast('请填写所有必填字段（带*号）', true);
+                return;
+            }
+            
+            // 获取关联字段
+            let relatedField = '';
+            if (type === 'expense') {
+                relatedField = document.getElementById('expense-project').value;
+            } else {
+                relatedField = document.getElementById('reimburse-customer').value;
+            }
+            
+            // 处理图片
+            let imgData = null;
+            if (imageInput.files && imageInput.files[0]) {
+                imgData = document.getElementById(`${prefix}-preview`).src;
+            }
+            
+            // 创建记录
+            const record = {
+                id: Date.now(),
+                time,
+                product,
+                related: relatedField,
+                reason,
+                amount: parseFloat(amount),
+                hasTicket,
+                ticketEntity,
+                image: imgData
+            };
+            
+            // 添加到对应数组
+            if (type === 'expense') {
+                expenseRecords.push(record);
+            } else {
+                reimburseRecords.push(record);
+            }
+            
+            // 清空表单
+            clearForm(type);
+            
+            // 更新显示
+            renderRecords(type);
+            
+            showToast('记录添加成功！');
+        }
+        
+        // 清空表单
+        function clearForm(type) {
+            const prefix = type;
+            const today = new Date().toISOString().split('T')[0];
+            
+            document.getElementById(`${prefix}-time`).value = today;
+            document.getElementById(`${prefix}-product`).value = '';
+            document.getElementById(`${prefix}-reason`).value = '';
+            document.getElementById(`${prefix}-amount`).value = '';
+            document.getElementById(`${prefix}-ticket-entity`).value = '';
+            
+            if (type === 'expense') {
+                document.getElementById('expense-project').value = '';
+            } else {
+                document.getElementById('reimburse-customer').value = '';
+            }
+            
+            // 重置图片
+            const preview = document.getElementById(`${prefix}-preview`);
+            preview.style.display = 'none';
+            preview.src = '';
+            const uploadDiv = document.getElementById(`${prefix}-image`).parentElement;
+            uploadDiv.querySelector('.icon').style.display = 'block';
+            uploadDiv.querySelector('p').style.display = 'block';
+            document.getElementById(`${prefix}-image`).value = '';
+        }
+        
+        // 渲染记录列表
+        function renderRecords(type) {
+            const records = type === 'expense' ? expenseRecords : reimburseRecords;
+            const container = document.getElementById(`${type}-records`);
+            const summaryDiv = document.getElementById(`${type}-summary`);
+            
+            if (records.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📭</div>
+                        <p>暂无记录，请添加${type === 'expense' ? '费用' : '报销'}记录</p>
+                    </div>
+                `;
+                summaryDiv.style.display = 'none';
+                return;
+            }
+            
+            const relatedLabel = type === 'expense' ? '关联项目' : '关联客户';
+            
+            let html = `
+                <table class="records-table">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>产品</th>
+                            <th>${relatedLabel}</th>
+                            <th>发生原因</th>
+                            <th>金额</th>
+                            <th>截图</th>
+                            <th>是否有票</th>
+                            <th>开票主体</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            let total = 0;
+            records.forEach((record, index) => {
+                total += record.amount;
+                const imgCell = record.image 
+                    ? `<div class="image-cell"><img src="${record.image}" onclick="showImageModal('${record.image}')"></div>`
+                    : '-';
+                
+                html += `
+                    <tr>
+                        <td>${record.time}</td>
+                        <td>${record.product}</td>
+                        <td>${record.related || '-'}</td>
+                        <td>${record.reason}</td>
+                        <td style="color: #e74c3c; font-weight: bold;">¥${record.amount.toFixed(2)}</td>
+                        <td>${imgCell}</td>
+                        <td>${record.hasTicket}</td>
+                        <td>${record.ticketEntity || '-'}</td>
+                        <td>
+                            <div class="actions">
+                                <button class="btn btn-danger" onclick="deleteRecord('${type}', ${index})">删除</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                    </tbody>
+                    <tfoot>
+                        <tr style="background: #f8f9ff; font-weight: bold;">
+                            <td colspan="4" style="text-align: right;">合计：</td>
+                            <td style="color: #e74c3c;">¥${total.toFixed(2)}</td>
+                            <td colspan="4"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            `;
+            
+            container.innerHTML = html;
+            
+            // 显示汇总
+            summaryDiv.innerHTML = `
+                <h4>📊 费用汇总</h4>
+                <div class="summary-row">
+                    <span>记录数量</span>
+                    <span>${records.length} 条</span>
+                </div>
+                <div class="summary-row">
+                    <span>总金额</span>
+                    <span>¥${total.toFixed(2)}</span>
+                </div>
+            `;
+            summaryDiv.style.display = 'block';
+        }
+        
+        // 删除记录
+        function deleteRecord(type, index) {
+            if (!confirm('确定要删除这条记录吗？')) return;
+            
+            if (type === 'expense') {
+                expenseRecords.splice(index, 1);
+            } else {
+                reimburseRecords.splice(index, 1);
+            }
+            
+            renderRecords(type);
+            showToast('记录已删除');
+        }
+        
+        // 显示图片模态框
+        function showImageModal(src) {
+            document.getElementById('modal-image').src = src;
+            document.getElementById('image-modal').classList.add('show');
+        }
+        
+        // 导出Excel（通过服务器API，支持图片嵌入）
+        async function exportToExcel() {
+            if (expenseRecords.length === 0 && reimburseRecords.length === 0) {
+                showToast('没有数据可导出', true);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/export`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        expense: expenseRecords,
+                        reimburse: reimburseRecords
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(`Excel导出成功！文件：${result.filename}`);
+                    // 自动下载
+                    window.open(`${API_BASE}/${result.filename}`, '_blank');
+                } else {
+                    showToast('导出失败：' + result.error, true);
+                }
+            } catch (e) {
+                showToast('导出失败，请确保服务器正在运行', true);
+            }
+        }
+        
+        // 保存到服务器
+        async function saveToServer() {
+            try {
+                const response = await fetch(`${API_BASE}/api/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        expense: expenseRecords,
+                        reimburse: reimburseRecords
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast('数据已保存到服务器');
+                } else {
+                    showToast('保存失败', true);
+                }
+            } catch (e) {
+                showToast('保存失败，请确保服务器正在运行', true);
+            }
+        }
+        
+        // 从服务器加载
+        async function loadFromServer() {
+            try {
+                const response = await fetch(`${API_BASE}/api/load`);
+                const data = await response.json();
+                
+                expenseRecords = data.expense || [];
+                reimburseRecords = data.reimburse || [];
+                
+                renderRecords('expense');
+                renderRecords('reimburse');
+                
+                if (expenseRecords.length > 0 || reimburseRecords.length > 0) {
+                    showToast(`已加载数据`);
+                }
+            } catch (e) {
+                console.log('服务器未运行或无数据');
+            }
+        }
+        
+        // 清空所有数据
+        function clearAll() {
+            if (!confirm('确定要清空所有数据吗？此操作不可恢复！')) return;
+            
+            expenseRecords = [];
+            reimburseRecords = [];
+            renderRecords('expense');
+            renderRecords('reimburse');
+            showToast('所有数据已清空');
+        }
+        
+        // 显示提示
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast show ${isError ? 'error' : ''}`;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
