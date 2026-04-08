@@ -23,6 +23,12 @@ import io
 import logging
 import signal
 import socket
+
+# Windows 终端 UTF-8 输出兼容
+if sys.platform == 'win32':
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, quote
@@ -448,13 +454,13 @@ def main():
     logging.info(f"日志文件: {LOG_FILE}")
     logging.info("=" * 52)
     print("\n" + "=" * 52)
-    print("报销费用填写工具 · 云服务器版")
+    print(">> 报销费用填写工具 . 云服务器版")
     print("=" * 52)
-    print(f"✅ 服务已启动，请访问:")
-    print(f"   本机: http://localhost:{port}")
-    print(f"   局域网: http://{get_local_ip()}:{port}")
-    print(f"   外网: http://<公网IP>:{port}")
-    print(f"\n停止服务: Ctrl+C")
+    print(f"  [OK] 服务已启动，请访问:")
+    print(f"       本机:    http://localhost:{port}")
+    print(f"       局域网:  http://{get_local_ip()}:{port}")
+    print(f"       外网:    http://<公网IP>:{port}")
+    print(f"\n  停止服务: Ctrl+C")
     print("=" * 52 + "\n")
 
     # 优雅退出
