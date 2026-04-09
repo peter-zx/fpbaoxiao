@@ -34,6 +34,13 @@ from pathlib import Path
 
 # ---- 依赖检查 ----
 try:
+    import xlsxwriter
+    HAS_XLSXWRITER = True
+except ImportError:
+    HAS_XLSXWRITER = False
+    print("❌ 缺少 xlsxwriter，请运行: pip install xlsxwriter")
+
+try:
     from openpyxl import Workbook, load_workbook
     from openpyxl.drawing.image import Image as XLImage
     from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
@@ -41,7 +48,7 @@ try:
     HAS_OPENPYXL = True
 except ImportError:
     HAS_OPENPYXL = False
-    print("❌ 缺少 openpyxl，请运行: pip install openpyxl Pillow")
+    print("⚠️ 缺少 openpyxl，Excel导出将使用xlsxwriter")
 
 try:
     from PIL import Image as PILImage
@@ -49,6 +56,55 @@ try:
 except ImportError:
     HAS_PIL = False
     print("❌ 缺少 Pillow，请运行: pip install Pillow")
+
+# ---- Office 工具检测 ----
+HAS_WIN32COM = False
+OFFICE_TYPE = None  # 'excel' 或 'wps'
+
+def detect_office_tool():
+    """检测可用的Office工具（Excel优先，其次WPS）"""
+    global HAS_WIN32COM, OFFICE_TYPE
+    
+    # 先尝试 Excel
+    try:
+        import win32com.client
+        excel = win32com.client.Dispatch('Excel.Application')
+        excel.Quit()
+        HAS_WIN32COM = True
+        OFFICE_TYPE = 'excel'
+        logging.info("检测到 Microsoft Excel COM")
+        return True
+    except:
+        pass
+    
+    # 再尝试 WPS ET (WPS表格)
+    try:
+        import win32com.client
+        et = win32com.client.Dispatch('ET.Application')
+        et.Quit()
+        HAS_WIN32COM = True
+        OFFICE_TYPE = 'wps'
+        logging.info("检测到 WPS 表格 COM")
+        return True
+    except:
+        pass
+    
+    # 最后尝试 WPS
+    try:
+        import win32com.client
+        wps = win32com.client.Dispatch('WPS.Application')
+        wps.Quit()
+        HAS_WIN32COM = True
+        OFFICE_TYPE = 'wps'
+        logging.info("检测到 WPS COM")
+        return True
+    except:
+        pass
+    
+    HAS_WIN32COM = False
+    OFFICE_TYPE = None
+    logging.info("未检测到 Office COM，将使用 xlsxwriter")
+    return False
 
 
 # ==================== 打包兼容处理 ====================
@@ -231,98 +287,464 @@ def parse_base64_image(base64_data):
         return None
 
 
-def create_excel_with_images(data):
-    """创建带图片的Excel"""
-    if not HAS_OPENPYXL or not HAS_PIL:
-        raise Exception("缺少必要库")
+def prepare_images_xlsx(records, prefix, img_tmp_dir):
+    """准备图片，返回 {excel_row: (img_path, pil_img)}"""
+    img_map = {}
+    for idx, r in enumerate(records):
+        if r.get('image'):
+            try:
+                pil_img = parse_base64_image(r['image'])
+                if pil_img:
+                    img_path = img_tmp_dir / f'{prefix}_{idx}.png'
+                    pil_img.save(str(img_path), format='PNG')
+                    # Excel行号：header=1，数据从2开始 → row_idx = idx+2
+                    img_map[idx + 2] = (str(img_path), pil_img)
+            except Exception as e:
+                logging.error(f"保存图片失败: {e}")
+    return img_map
 
-    wb = Workbook()
-    wb.remove(wb.active)
 
-    # 样式
-    header_font = Font(bold=True, color='FFFFFF')
-    header_fill = PatternFill(start_color='667eea', end_color='667eea', fill_type='solid')
-    header_alignment = Alignment(horizontal='center', vertical='center')
-    thin_border = Border(
-        left=Side(style='thin'), right=Side(style='thin'),
-        top=Side(style='thin'), bottom=Side(style='thin')
-    )
+def write_sheet_xlsx(ws, records, img_map):
+    """用 xlsxwriter 写单个 sheet
+    图片用 insert_image() + object_position=2 → 真正的"放置在单元格中"（随单元格移动和调整大小）
+    """
+    # ---- 表头样式：字号12，加粗，居中，黑色，无背景色 ----
+    header_fmt = ws.add_format({
+        'bold': True,
+        'font_size': 12,
+        'font_name': '微软雅黑',
+        'font_color': '#000000',
+        'bg_color': '#FFFFFF',
+        'align': 'center',
+        'valign': 'vcenter',
+        'border': 1,
+    })
+    # ---- 数据行样式 ----
+    data_fmt = ws.add_format({
+        'font_size': 10,
+        'font_name': '微软雅黑',
+        'font_color': '#000000',
+        'align': 'center',
+        'valign': 'vcenter',
+        'border': 1,
+    })
+    money_fmt = ws.add_format({
+        'font_size': 10,
+        'font_name': '微软雅黑',
+        'font_color': '#000000',
+        'align': 'center',
+        'valign': 'vcenter',
+        'num_format': '¥#,##0.00',
+        'border': 1,
+    })
+    total_label_fmt = ws.add_format({
+        'bold': True,
+        'font_size': 10,
+        'font_name': '微软雅黑',
+        'font_color': '#000000',
+        'align': 'right',
+        'valign': 'vcenter',
+        'border': 1,
+    })
+    total_money_fmt = ws.add_format({
+        'bold': True,
+        'font_size': 10,
+        'font_name': '微软雅黑',
+        'font_color': '#000000',
+        'align': 'center',
+        'valign': 'vcenter',
+        'num_format': '¥#,##0.00',
+        'border': 1,
+    })
 
-    # 费用模板
-    ws1 = wb.create_sheet('费用模板')
+    # ---- 列宽：第6列(F)=22，其他标准 ----
+    # 注意：xlsxwriter 列宽单位是"字符数"，第6列(F)=截图列给较宽空间
+    col_widths = [12, 16, 14, 18, 12, 22, 8, 14]
+    ws.set_column(0, 0, col_widths[0])  # A 时间
+    ws.set_column(1, 1, col_widths[1])  # B 产品
+    ws.set_column(2, 2, col_widths[2])  # C 关联项目
+    ws.set_column(3, 3, col_widths[3])  # D 发生原因
+    ws.set_column(4, 4, col_widths[4])  # E 金额
+    ws.set_column(5, 5, col_widths[5])  # F 截图（较宽）
+    ws.set_column(6, 6, col_widths[6])  # G 是否有票
+    ws.set_column(7, 7, col_widths[7])  # H 开票主体
+
+    # ---- 表头（无合并行，直接第一行）----
     headers = ['时间', '产品', '关联项目', '发生原因', '金额', '详情截图', '是否有票', '开票主体']
-    
-    ws1.merge_cells('A1:H1')
-    ws1['A1'] = '报销详情'
-    ws1['A1'].font = Font(bold=True, size=14)
-    ws1['A1'].alignment = Alignment(horizontal='center')
+    for col, h in enumerate(headers):
+        ws.write(0, col, h, header_fmt)
+    ws.set_row(0, 40)  # 表头行高=40
 
-    for col, h in enumerate(headers, 1):
-        cell = ws1.cell(row=2, column=col, value=h)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = thin_border
+    # ---- 数据行 ----
+    total = 0.0
+    for idx, r in enumerate(records):
+        excel_row = idx + 1   # 0-based row index
+        data_row = excel_row + 1  # Excel 1-based 行号（header=0，数据从1开始，合计在最后）
 
-    for row_idx, r in enumerate(data.get('expense', []), 3):
-        ws1.cell(row=row_idx, column=1, value=r.get('time', '')).border = thin_border
-        ws1.cell(row=row_idx, column=2, value=r.get('product', '')).border = thin_border
-        ws1.cell(row=row_idx, column=3, value=r.get('related', '')).border = thin_border
-        ws1.cell(row=row_idx, column=4, value=r.get('reason', '')).border = thin_border
-        ws1.cell(row=row_idx, column=5, value=r.get('amount', 0)).border = thin_border
-        ws1.cell(row=row_idx, column=7, value=r.get('hasTicket', '')).border = thin_border
-        ws1.cell(row=row_idx, column=8, value=r.get('ticketEntity', '')).border = thin_border
-        ws1.row_dimensions[row_idx].height = 80
+        total += r.get('amount', 0)
 
-        if r.get('image'):
-            pil_img = parse_base64_image(r['image'])
-            if pil_img:
-                pil_img.thumbnail((150, 100))
-                img_buffer = io.BytesIO()
-                fmt = pil_img.format if pil_img.format else 'PNG'
-                pil_img.save(img_buffer, format='JPEG' if fmt == 'JPEG' else 'PNG')
-                img_buffer.seek(0)
-                xl_img = XLImage(img_buffer)
-                xl_img.anchor = f'F{row_idx}'
-                ws1.add_image(xl_img)
+        ws.write(excel_row, 0, r.get('time', ''), data_fmt)
+        ws.write(excel_row, 1, r.get('product', ''), data_fmt)
+        ws.write(excel_row, 2, r.get('related', '') or '-', data_fmt)
+        ws.write(excel_row, 3, r.get('reason', ''), data_fmt)
+        ws.write_number(excel_row, 4, r.get('amount', 0), money_fmt)
+        ws.write(excel_row, 6, r.get('hasTicket', ''), data_fmt)
+        ws.write(excel_row, 7, r.get('ticketEntity', '') or '-', data_fmt)
 
-    # 报销模板
-    ws2 = wb.create_sheet('报销模板')
-    for col, h in enumerate(headers, 1):
-        cell = ws2.cell(row=2, column=col, value=h)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = thin_border
+        # 数据行高=180（给图片足够空间）
+        ws.set_row(excel_row, 180)
 
-    for row_idx, r in enumerate(data.get('reimburse', []), 3):
-        ws2.cell(row=row_idx, column=1, value=r.get('time', '')).border = thin_border
-        ws2.cell(row=row_idx, column=2, value=r.get('product', '')).border = thin_border
-        ws2.cell(row=row_idx, column=3, value=r.get('related', '')).border = thin_border
-        ws2.cell(row=row_idx, column=4, value=r.get('reason', '')).border = thin_border
-        ws2.cell(row=row_idx, column=5, value=r.get('amount', 0)).border = thin_border
-        ws2.cell(row=row_idx, column=7, value=r.get('hasTicket', '')).border = thin_border
-        ws2.cell(row=row_idx, column=8, value=r.get('ticketEntity', '')).border = thin_border
-        ws2.row_dimensions[row_idx].height = 80
+        # 插入图片（embed_image = 放置在单元格中，随单元格缩放）
+        if data_row in img_map:
+            img_path, pil_img = img_map[data_row]
+            orig_w, orig_h = pil_img.size
 
-        if r.get('image'):
-            pil_img = parse_base64_image(r['image'])
-            if pil_img:
-                pil_img.thumbnail((150, 100))
-                img_buffer = io.BytesIO()
-                fmt = pil_img.format if pil_img.format else 'PNG'
-                pil_img.save(img_buffer, format='JPEG' if fmt == 'JPEG' else 'PNG')
-                img_buffer.seek(0)
-                xl_img = XLImage(img_buffer)
-                xl_img.anchor = f'F{row_idx}'
-                ws2.add_image(xl_img)
+            # 计算缩放：使图片等比填满行高
+            row_h = 120  # 磅
+            col_w_approx = col_widths[5] * 7.5  # ≈ 字符数×7.5 = 磅
+            scale_h = row_h / orig_h if orig_h > 0 else 1.0
+            scale_w = col_w_approx / orig_w if orig_w > 0 else 1.0
+            scale = min(scale_h, scale_w, 1.0)  # 不放大
 
-    # 保存
+            # object_position=2: 移动并随单元格调整大小（真正的"放置在单元格中"）
+            ws.insert_image(
+                excel_row, 5,   # row=excel_row, col=5（第6列 F）
+                img_path,
+                {
+                    'x_scale': scale,
+                    'y_scale': scale,
+                    'object_position': 2,   # ← 关键：随单元格移动和缩放
+                }
+            )
+        else:
+            # 无图片格留空或填 -
+            pass
+
+    # ---- 合计行 ----
+    if records:
+        total_row = len(records)  # 0-based
+        ws.write(total_row, 3, '合计：', total_label_fmt)
+        ws.write_number(total_row, 4, total, total_money_fmt)
+        ws.set_row(total_row, 60)
+
+
+def create_excel_with_images(data):
+    """创建带图片的Excel - xlsxwriter 方案（稳定、跨平台、不依赖 Office）
+    核心：insert_image() + object_position=2 → Excel "放置在单元格中"（随单元格移动和调整大小）
+    优势：代码简洁、稳定、不需本机安装 Office、批量生成快
+    注意：需要 Excel 365 2023+ 或支持 Place-in-Cell 的版本（如新版 WPS）
+    """
+    if not HAS_XLSXWRITER:
+        raise Exception("缺少 xlsxwriter，请运行: pip install xlsxwriter")
+    if not HAS_PIL:
+        raise Exception("缺少 Pillow，请运行: pip install Pillow")
+
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     filename = f'报销汇总_{timestamp}.xlsx'
     out_path = OUTPUT_DIR / filename
-    wb.save(out_path)
+
+    # 过滤：只导出勾选记录（_checked 默认为 true 保持兼容）
+    expense_records = data.get('expense', [])
+    reimburse_records = data.get('reimburse', [])
+
+    # 图片临时目录
+    img_tmp_dir = OUTPUT_DIR / '_img_tmp'
+    img_tmp_dir.mkdir(exist_ok=True)
+
+    # 准备图片
+    expense_imgs = prepare_images_xlsx(expense_records, 'expense', img_tmp_dir)
+    reimburse_imgs = prepare_images_xlsx(reimburse_records, 'reimburse', img_tmp_dir)
+
+    # 创建 Workbook
+    wb = xlsxwriter.Workbook(str(out_path))
+
+    # 费用模板
+    if expense_records:
+        ws1 = wb.add_worksheet('费用模板')
+        write_sheet_xlsx(ws1, expense_records, expense_imgs)
+
+    # 报销模板
+    if reimburse_records:
+        ws2 = wb.add_worksheet('报销模板')
+        write_sheet_xlsx(ws2, reimburse_records, reimburse_imgs)
+
+    # 无数据时保留一个空sheet
+    if not expense_records and not reimburse_records:
+        ws = wb.add_worksheet('费用模板')
+        ws.write(0, 0, '无数据')
+
+    wb.close()
+
+    # 清理临时图片
+    try:
+        import shutil
+        shutil.rmtree(img_tmp_dir, ignore_errors=True)
+    except:
+        pass
+
+    logging.info(f"xlsxwriter 生成 Excel 成功: {out_path}")
     return out_path, filename
+
+
+def create_excel_with_com(data):
+    """创建带图片的Excel - 使用 COM 接口（Excel 或 WPS）实现真正嵌入单元格"""
+    global OFFICE_TYPE
+    
+    if not HAS_WIN32COM:
+        raise Exception("未检测到 Office COM 接口")
+    
+    if not HAS_PIL:
+        raise Exception("缺少 Pillow 库")
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'报销汇总_{timestamp}.xlsx'
+    out_path = OUTPUT_DIR / filename
+    
+    # 图片临时目录
+    img_tmp_dir = OUTPUT_DIR / '_img_tmp'
+    img_tmp_dir.mkdir(exist_ok=True)
+    
+    # 保存图片到临时目录
+    def prepare_images(records, prefix):
+        img_map = {}  # {row_idx: img_path}
+        for idx, r in enumerate(records):
+            if r.get('image'):
+                try:
+                    pil_img = parse_base64_image(r['image'])
+                    if pil_img:
+                        ext = 'png'
+                        img_path = img_tmp_dir / f'{prefix}_{idx}.{ext}'
+                        pil_img.save(str(img_path), format='PNG')
+                        img_map[idx + 2] = str(img_path)  # Excel行号从1开始，数据从第2行开始
+                except Exception as e:
+                    logging.error(f"保存图片失败: {e}")
+        return img_map
+    
+    # 准备两个表的数据
+    expense_records = data.get('expense', [])
+    reimburse_records = data.get('reimburse', [])
+    
+    expense_imgs = prepare_images(expense_records, 'expense')
+    reimburse_imgs = prepare_images(reimburse_records, 'reimburse')
+    
+    # 启动 Excel/WPS
+    import win32com.client
+    app = None
+    
+    try:
+        if OFFICE_TYPE == 'excel':
+            app = win32com.client.Dispatch('Excel.Application')
+        else:
+            # WPS ET
+            app = win32com.client.Dispatch('ET.Application')
+        
+        app.Visible = False
+        app.DisplayAlerts = False
+        
+        wb = app.Workbooks.Add()
+        
+        # 删除默认sheet，保留需要的
+        while wb.Sheets.Count > 1:
+            wb.Sheets(wb.Sheets.Count).Delete()
+        
+        headers = ['时间', '产品', '关联项目', '发生原因', '金额', '详情截图', '是否有票', '开票主体']
+        
+        def write_sheet_com(ws, sheet_name, records, img_map, related_label):
+            ws.Name = sheet_name
+            
+            # 写入表头（无背景色，黑色，加粗，居中）
+            for col_idx, h in enumerate(headers, 1):
+                cell = ws.Cells(1, col_idx)
+                cell.Value = h
+                cell.Font.Bold = True
+                cell.Font.Size = 10
+                cell.Font.Name = '微软雅黑'
+                cell.Interior.ColorIndex = -4142  # 无背景色
+                cell.Font.Color = 0x000000  # 黑色
+                cell.HorizontalAlignment = -4108  # 水平居中
+                cell.VerticalAlignment = -4160  # 垂直居中
+            
+            # 设置列宽（标准列宽，第6列=40）
+            col_widths = [12, 16, 14, 18, 12, 40, 8, 14]
+            for col_idx, width in enumerate(col_widths, 1):
+                try:
+                    ws.Columns(col_idx).ColumnWidth = width
+                    logging.info(f"设置第{col_idx}列列宽={width}")
+                except Exception as e:
+                    logging.warning(f"设置第{col_idx}列列宽失败: {e}，继续...")
+            
+            # 设置表头行高=40
+            try:
+                ws.Rows(1).RowHeight = 40
+                logging.info("设置表头行高=40")
+            except Exception as e:
+                logging.warning(f"设置表头行高失败: {e}")
+            
+            # 第三步：写入数据并插入图片
+            total = 0.0
+            for row_idx, r in enumerate(records, 2):
+                total += r.get('amount', 0)
+                
+                # 数据行样式（居中，字体10）
+                def style_cell(cell):
+                    cell.HorizontalAlignment = -4108  # 水平居中
+                    cell.VerticalAlignment = -4160   # 垂直居中
+                    cell.Font.Size = 10
+                    cell.Font.Name = '微软雅黑'
+                
+                # 先赋值，再样式（避免被覆盖）
+                cell1 = ws.Cells(row_idx, 1)
+                cell1.Value = r.get('time', '')
+                style_cell(cell1)
+                
+                cell2 = ws.Cells(row_idx, 2)
+                cell2.Value = r.get('product', '')
+                style_cell(cell2)
+                
+                cell3 = ws.Cells(row_idx, 3)
+                cell3.Value = r.get(related_label, '') or '-'
+                style_cell(cell3)
+                
+                cell4 = ws.Cells(row_idx, 4)
+                cell4.Value = r.get('reason', '')
+                style_cell(cell4)
+                
+                cell5 = ws.Cells(row_idx, 5)
+                cell5.Value = r.get('amount', 0)
+                cell5.NumberFormat = '¥#,##0.00'
+                style_cell(cell5)
+                
+                cell7 = ws.Cells(row_idx, 7)
+                cell7.Value = r.get('hasTicket', '')
+                style_cell(cell7)
+                
+                cell8 = ws.Cells(row_idx, 8)
+                cell8.Value = r.get('ticketEntity', '') or '-'
+                style_cell(cell8)
+                
+                # 设置数据行行高=300
+                try:
+                    ws.Rows(row_idx).RowHeight = 300
+                except Exception as e:
+                    logging.warning(f"设置第{row_idx}行行高失败: {e}")
+                
+                # 插入图片（缩放匹配单元格尺寸）
+                if row_idx in img_map:
+                    try:
+                        img_path = img_map[row_idx]
+                        orig_w, orig_h = 0, 0
+                        if r.get('image'):
+                            try:
+                                pil_img = parse_base64_image(r['image'])
+                                if pil_img:
+                                    orig_w, orig_h = pil_img.size
+                            except:
+                                pass
+                        
+                        # 直接用单元格尺寸
+                        cell = ws.Cells(row_idx, 6)
+                        cell_width = cell.Width   # 单元格宽度（磅）
+                        cell_height = cell.Height  # 单元格高度（磅）
+                        
+                        # 计算缩放（保持比例，适应单元格）
+                        if orig_w > 0 and orig_h > 0:
+                            scale = min(cell_width / orig_w, cell_height / orig_h)
+                            if scale > 1:
+                                scale = 1  # 不放大
+                            display_w = orig_w * scale
+                            display_h = orig_h * scale
+                        else:
+                            display_w = cell_width - 4
+                            display_h = cell_height - 4
+                        
+                        # 居中偏移
+                        offset_x = (cell_width - display_w) / 2
+                        offset_y = (cell_height - display_h) / 2
+                        
+                        pic = ws.Shapes.AddPicture(
+                            img_path,
+                            LinkToFile=False,
+                            SaveWithDocument=True,
+                            Left=cell.Left + offset_x,
+                            Top=cell.Top + offset_y,
+                            Width=display_w,
+                            Height=display_h
+                        )
+                        pic.Placement = 1
+                    except Exception as e:
+                        logging.error(f"插入图片失败: {e}")
+                        ws.Cells(row_idx, 6).Value = '图片加载失败'
+            
+            # 合计行
+            total_row = len(records) + 2
+            
+            # 合计行样式
+            def style_total_cell(cell):
+                cell.Font.Bold = True
+                cell.Font.Size = 10
+                cell.Font.Name = '微软雅黑'
+                cell.HorizontalAlignment = -4108  # 水平居中
+                cell.VerticalAlignment = -4160   # 垂直居中
+            
+            style_total_cell(ws.Cells(total_row, 4))
+            ws.Cells(total_row, 4).Value = '合计：'
+            
+            style_total_cell(ws.Cells(total_row, 5))
+            ws.Cells(total_row, 5).Value = total
+            ws.Cells(total_row, 5).NumberFormat = '¥#,##0.00'
+            # 设置合计行行高=300
+            try:
+                ws.Rows(total_row).RowHeight = 300
+            except Exception as e:
+                logging.warning(f"设置合计行行高失败: {e}")
+        
+        # 写入费用模板
+        if expense_records:
+            if wb.Sheets.Count == 0:
+                wb.Worksheets.Add()
+            ws1 = wb.Worksheets(1)
+            write_sheet_com(ws1, '费用模板', expense_records, expense_imgs, 'related')
+        
+        # 写入报销模板
+        if reimburse_records:
+            if wb.Sheets.Count == 1 and expense_records:
+                wb.Worksheets.Add()
+            ws2 = wb.Worksheets(2) if wb.Sheets.Count >= 2 else wb.Worksheets.Add()
+            write_sheet_com(ws2, '报销模板', reimburse_records, reimburse_imgs, 'related')
+        
+        # 如果没有数据，至少一个sheet
+        if not expense_records and not reimburse_records:
+            ws = wb.Worksheets(1)
+            ws.Name = '费用模板'
+            ws.Cells(1, 1).Value = '无数据'
+        
+        # 保存文件
+        # xlOpenXMLWorkbook = 51
+        wb.SaveAs(str(out_path), 51)
+        wb.Close()
+        
+    finally:
+        if app:
+            app.Quit()
+    
+    # 清理临时图片
+    try:
+        import shutil
+        shutil.rmtree(img_tmp_dir, ignore_errors=True)
+    except:
+        pass
+    
+    return out_path, filename
+
+
+def get_excel_creator_info():
+    """获取当前Excel生成器的信息"""
+    if HAS_XLSXWRITER:
+        return {'type': 'xlsxwriter', 'tool': 'xlsxwriter'}
+    elif HAS_WIN32COM:
+        return {'type': 'com', 'tool': OFFICE_TYPE}
+    else:
+        return {'type': 'none', 'tool': 'none'}
 
 
 # ==================== HTTP 服务器 ====================
@@ -357,7 +779,11 @@ class APIHandler(SimpleHTTPRequestHandler):
 
         # 健康检查
         if path == '/api/health':
-            self.send_json({'status': 'ok', 'time': datetime.now().isoformat()})
+            self.send_json({
+                'status': 'ok',
+                'time': datetime.now().isoformat(),
+                'excel_creator': get_excel_creator_info(),
+            })
 
         # 加载数据
         elif path == '/api/load':
@@ -441,11 +867,30 @@ class APIHandler(SimpleHTTPRequestHandler):
 
             elif path == '/api/export':
                 data = self._read_json_body()
-                out_path, filename = create_excel_with_images(data)
+                # 优先使用 xlsxwriter（稳定、跨平台、不依赖 Office、图片嵌入单元格）
+                # xlsxwriter insert_image + object_position=2 = Excel "放置在单元格中"
+                # 回退到 COM（Excel/WPS）—— 仅在 xlsxwriter 不可用时
+                if HAS_XLSXWRITER:
+                    try:
+                        out_path, filename = create_excel_with_images(data)
+                        logging.info("使用 xlsxwriter 生成 Excel（embed_image = Place in Cell）")
+                    except Exception as e:
+                        logging.warning(f"xlsxwriter 生成失败，回退到 COM: {e}")
+                        if HAS_WIN32COM:
+                            out_path, filename = create_excel_with_com(data)
+                        else:
+                            raise
+                elif HAS_WIN32COM:
+                    out_path, filename = create_excel_with_com(data)
+                    logging.info("使用 COM 接口生成 Excel")
+                else:
+                    self.send_json({'success': False, 'error': '无可用 Excel 生成引擎（请安装 xlsxwriter 或 Office/WPS）'}, status=500)
+                    return
                 self.send_json({
                     'success': True,
                     'filename': filename,
-                    'download_url': f'/exports/{filename}'
+                    'download_url': f'/exports/{filename}',
+                    'creator': get_excel_creator_info(),
                 })
 
             elif path == '/api/load':
@@ -467,6 +912,10 @@ class APIHandler(SimpleHTTPRequestHandler):
 def main():
     load_config()
     init_logging()
+
+    # 检测 Office 工具 (Excel / WPS)
+    detect_office_tool()
+    logging.info(f"Excel生成器: {get_excel_creator_info()}")
 
     if not HAS_OPENPYXL or not HAS_PIL:
         logging.error("缺少必要依赖！")

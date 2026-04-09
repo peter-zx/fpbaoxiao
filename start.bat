@@ -13,6 +13,6 @@ echo ============================================
 echo.
 
 cd /d "%~dp0%"
-python server.py
+python server_cloud.py
 
 pause
