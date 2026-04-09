@@ -805,13 +805,21 @@
             const data = await res.json();
             if (data.success) {
                 showToast('📄 导出成功：' + data.filename);
-                // 用 a[download] 触发文件下载
-                const a = document.createElement('a');
-                a.href = data.download_url;
-                a.download = data.filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
+                // 用 fetch + blob 方式下载，避免 URL 编码问题
+                try {
+                    const fileRes = await fetch(data.download_url);
+                    const blob = await fileRes.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = data.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    showToast('下载文件时出错，请手动保存', true);
+                }
                 highlightStep(4);
             } else {
                 showToast('导出失败：' + data.error, true);
