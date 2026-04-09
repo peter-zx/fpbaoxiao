@@ -368,6 +368,13 @@
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
 
+        /* 勾选框美化 */
+        .records-table input[type="checkbox"] {
+            width: 16px; height: 16px;
+            accent-color: #4f46e5;
+            cursor: pointer;
+        }
+
         /* 响应式 */
         @media (max-width: 900px) {
             .layout { flex-direction: column; }
@@ -703,7 +710,8 @@
             amount: parseFloat(amount),
             hasTicket: document.getElementById(p + '-ticket').value,
             ticketEntity: document.getElementById(p + '-entity').value,
-            image
+            image,
+            _checked: true
         };
 
         (type === 'expense' ? expenseRecords : reimburseRecords).push(record);
@@ -738,7 +746,10 @@
         const p = type === 'expense' ? 'e' : 'r';
         const container = document.getElementById(p + '-records');
         const countEl = document.getElementById(p + '-count');
-        countEl.textContent = '共 ' + records.length + ' 条';
+        const checkedCount = records.filter(r => r._checked).length;
+        countEl.textContent = records.length > 0
+            ? `共 ${records.length} 条，已选 ${checkedCount} 条`
+            : '共 0 条';
 
         if (records.length === 0) {
             container.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div>暂无记录，请在上方填写信息后点击「添加记录」</div></div>';
@@ -746,20 +757,31 @@
         }
 
         const relatedLabel = type === 'expense' ? '关联项目' : '关联客户';
-        let total = 0;
+        const allChecked = records.every(r => r._checked);
+        let totalAll = 0;
+        let totalChecked = 0;
         let html = `<table class="records-table">
             <thead><tr>
+                <th style="width:36px;text-align:center">
+                    <input type="checkbox" id="${p}-checkall" ${allChecked?'checked':''}
+                        onchange="toggleAll('${type}',this.checked)" title="全选/取消全选">
+                </th>
                 <th>时间</th><th>产品</th><th>${relatedLabel}</th>
                 <th>原因</th><th>金额</th><th>截图</th>
                 <th>有票</th><th>开票主体</th><th>操作</th>
             </tr></thead><tbody>`;
 
         records.forEach((r, i) => {
-            total += r.amount;
+            totalAll += r.amount;
+            if (r._checked) totalChecked += r.amount;
             const imgHtml = r.image
                 ? `<div class="img-cell"><img src="${r.image}" onclick="showModal('${r.image}')"></div>`
                 : '<span style="color:#ccc">-</span>';
-            html += `<tr>
+            html += `<tr style="${r._checked?'background:#f0fdf4':''}">
+                <td style="text-align:center">
+                    <input type="checkbox" ${r._checked?'checked':''}
+                        onchange="toggleRecord('${type}',${i},this.checked)">
+                </td>
                 <td>${r.time}</td><td>${r.product}</td><td>${r.related||'-'}</td>
                 <td>${r.reason}</td>
                 <td class="amount">¥${r.amount.toFixed(2)}</td>
@@ -770,11 +792,27 @@
         });
 
         html += `</tbody><tfoot><tr>
-            <td colspan="4" style="text-align:right">合计：</td>
-            <td class="amount">¥${total.toFixed(2)}</td>
+            <td colspan="5" style="text-align:right">
+                全部合计：¥${totalAll.toFixed(2)}
+                ${checkedCount > 0 ? `&nbsp;&nbsp;|&nbsp;&nbsp;<span style="color:#059669">选中合计：¥${totalChecked.toFixed(2)}</span>` : ''}
+            </td>
+            <td class="amount">${checkedCount > 0 ? '¥'+totalChecked.toFixed(2) : '¥'+totalAll.toFixed(2)}</td>
             <td colspan="4"></td>
         </tr></tfoot></table>`;
         container.innerHTML = html;
+    }
+
+    /* ====== 勾选/全选 ====== */
+    function toggleRecord(type, idx, checked) {
+        const records = type === 'expense' ? expenseRecords : reimburseRecords;
+        records[idx]._checked = checked;
+        renderRecords(type);
+    }
+
+    function toggleAll(type, checked) {
+        const records = type === 'expense' ? expenseRecords : reimburseRecords;
+        records.forEach(r => r._checked = checked);
+        renderRecords(type);
     }
 
     /* ====== 删除记录 ====== */
@@ -793,18 +831,27 @@
 
     /* ====== 导出 ====== */
     async function exportToExcel() {
-        if (expenseRecords.length === 0 && reimburseRecords.length === 0) {
-            showToast('没有数据可导出', true); return;
+        // 只导出勾选的记录；如果没有勾选任何记录，提示用户
+        const selectedExpense = expenseRecords.filter(r => r._checked);
+        const selectedReimburse = reimburseRecords.filter(r => r._checked);
+        const hasSelection = selectedExpense.length > 0 || selectedReimburse.length > 0;
+        const hasAnyData = expenseRecords.length > 0 || reimburseRecords.length > 0;
+
+        if (!hasAnyData) { showToast('没有数据可导出', true); return; }
+        if (!hasSelection) {
+            showToast('请先勾选要导出的记录（表头可全选）', true); return;
         }
+
         try {
             const res = await fetch(API + '/api/export', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ expense: expenseRecords, reimburse: reimburseRecords })
+                body: JSON.stringify({ expense: selectedExpense, reimburse: selectedReimburse })
             });
             const data = await res.json();
             if (data.success) {
-                showToast('📄 导出成功：' + data.filename);
+                const total = selectedExpense.length + selectedReimburse.length;
+                showToast('📄 已导出 ' + total + ' 条记录：' + data.filename);
                 // 用 fetch + blob 方式下载，避免 URL 编码问题
                 try {
                     const fileRes = await fetch(data.download_url);
@@ -845,8 +892,8 @@
         try {
             const res = await fetch(API + '/api/load');
             const data = await res.json();
-            expenseRecords = data.expense || [];
-            reimburseRecords = data.reimburse || [];
+            expenseRecords = (data.expense || []).map(r => ({ ...r, _checked: r._checked !== false }));
+            reimburseRecords = (data.reimburse || []).map(r => ({ ...r, _checked: r._checked !== false }));
             renderRecords('expense');
             renderRecords('reimburse');
             if (expenseRecords.length || reimburseRecords.length) showToast('📂 数据已加载');
