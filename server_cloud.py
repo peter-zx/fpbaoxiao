@@ -132,15 +132,21 @@ def get_data_dir():
 BASE_DIR   = get_base_dir()
 DATA_DIR   = get_data_dir()
 DATA_FILE  = DATA_DIR / 'data.json'
-IMAGE_DIR  = DATA_DIR / 'images'
 CONFIG_FILE = DATA_DIR / 'config.json'
 LOG_FILE   = DATA_DIR / 'server.log'
 OUTPUT_DIR = DATA_DIR / 'exports'
-
-# 确保目录存在
 DATA_DIR.mkdir(exist_ok=True)
-IMAGE_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
+
+# 清理旧版遗留的 images 文件夹（新版图片走 base64，不再需要）
+import shutil as _shutil
+_old_img_dir = Path(__file__).parent.resolve() / 'images'
+if _old_img_dir.exists() and _old_img_dir.is_dir():
+    try:
+        _shutil.rmtree(_old_img_dir)
+        print(f"已清理旧版遗留目录: {_old_img_dir}")
+    except Exception:
+        pass
 
 # ---- 默认配置 ----
 DEFAULT_CONFIG = {
@@ -304,12 +310,14 @@ def prepare_images_xlsx(records, prefix, img_tmp_dir):
     return img_map
 
 
-def write_sheet_xlsx(ws, records, img_map):
+def write_sheet_xlsx(wb, ws, records, img_map):
     """用 xlsxwriter 写单个 sheet
-    图片用 insert_image() + object_position=2 → 真正的"放置在单元格中"（随单元格移动和调整大小）
+    图片用 insert_image() + x_scale/y_scale + object_position=2
+    → 缩放后嵌入，随单元格移动（浮动图片，兼容所有 Excel 版本）
     """
     # ---- 表头样式：字号12，加粗，居中，黑色，无背景色 ----
-    header_fmt = ws.add_format({
+    # 注意：xlsxwriter 的 add_format() 在 workbook 上，不在 worksheet 上
+    header_fmt = wb.add_format({
         'bold': True,
         'font_size': 12,
         'font_name': '微软雅黑',
@@ -320,7 +328,7 @@ def write_sheet_xlsx(ws, records, img_map):
         'border': 1,
     })
     # ---- 数据行样式 ----
-    data_fmt = ws.add_format({
+    data_fmt = wb.add_format({
         'font_size': 10,
         'font_name': '微软雅黑',
         'font_color': '#000000',
@@ -328,7 +336,7 @@ def write_sheet_xlsx(ws, records, img_map):
         'valign': 'vcenter',
         'border': 1,
     })
-    money_fmt = ws.add_format({
+    money_fmt = wb.add_format({
         'font_size': 10,
         'font_name': '微软雅黑',
         'font_color': '#000000',
@@ -337,7 +345,7 @@ def write_sheet_xlsx(ws, records, img_map):
         'num_format': '¥#,##0.00',
         'border': 1,
     })
-    total_label_fmt = ws.add_format({
+    total_label_fmt = wb.add_format({
         'bold': True,
         'font_size': 10,
         'font_name': '微软雅黑',
@@ -346,7 +354,7 @@ def write_sheet_xlsx(ws, records, img_map):
         'valign': 'vcenter',
         'border': 1,
     })
-    total_money_fmt = ws.add_format({
+    total_money_fmt = wb.add_format({
         'bold': True,
         'font_size': 10,
         'font_name': '微软雅黑',
@@ -357,9 +365,9 @@ def write_sheet_xlsx(ws, records, img_map):
         'border': 1,
     })
 
-    # ---- 列宽：第6列(F)=22，其他标准 ----
-    # 注意：xlsxwriter 列宽单位是"字符数"，第6列(F)=截图列给较宽空间
-    col_widths = [12, 16, 14, 18, 12, 22, 8, 14]
+    # ---- 列宽：第6列(F)=25（截图列），其他标准 ----
+    # xlsxwriter 列宽单位=字符数；1字符≈7.2pt(10pt雅黑)，即 1 char ≈ 9 px (96dpi)
+    col_widths = [12, 16, 14, 18, 12, 25, 8, 14]
     ws.set_column(0, 0, col_widths[0])  # A 时间
     ws.set_column(1, 1, col_widths[1])  # B 产品
     ws.set_column(2, 2, col_widths[2])  # C 关联项目
@@ -391,48 +399,52 @@ def write_sheet_xlsx(ws, records, img_map):
         ws.write(excel_row, 6, r.get('hasTicket', ''), data_fmt)
         ws.write(excel_row, 7, r.get('ticketEntity', '') or '-', data_fmt)
 
-        # 数据行高=180（给图片足够空间）
-        ws.set_row(excel_row, 180)
+        # 数据行高=200（给图片足够空间）
+        ws.set_row(excel_row, 200)
 
-        # 插入图片（embed_image = 放置在单元格中，随单元格缩放）
+        # 插入图片
         if data_row in img_map:
             img_path, pil_img = img_map[data_row]
             orig_w, orig_h = pil_img.size
 
-            # 计算缩放：使图片等比填满行高
-            row_h = 120  # 磅
-            col_w_approx = col_widths[5] * 7.5  # ≈ 字符数×7.5 = 磅
-            scale_h = row_h / orig_h if orig_h > 0 else 1.0
-            scale_w = col_w_approx / orig_w if orig_w > 0 else 1.0
-            scale = min(scale_h, scale_w, 1.0)  # 不放大
+            # 缩放图片至单元格 90%（列宽25字符≈180pt，行高200pt）
+            # 90% 填充：留少量内边距
+            max_w = 180  # 列宽 180 pt
+            max_h = 190  # 行高 190 pt
+            if orig_w > 0 and orig_h > 0:
+                scale = min(max_w / orig_w, max_h / orig_h, 1.0)
+                display_w = orig_w * scale
+                display_h = orig_h * scale
+                x_scale = display_w / orig_w
+                y_scale = display_h / orig_h
+            else:
+                display_w, display_h = max_w, max_h
+                x_scale = y_scale = 1.0
 
-            # object_position=2: 移动并随单元格调整大小（真正的"放置在单元格中"）
             ws.insert_image(
-                excel_row, 5,   # row=excel_row, col=5（第6列 F）
+                excel_row, 5,
                 img_path,
                 {
-                    'x_scale': scale,
-                    'y_scale': scale,
-                    'object_position': 2,   # ← 关键：随单元格移动和缩放
+                    'x_scale': x_scale,
+                    'y_scale': y_scale,
+                    'object_position': 2,
                 }
             )
         else:
-            # 无图片格留空或填 -
-            pass
+            ws.write(excel_row, 5, '', data_fmt)
 
-    # ---- 合计行 ----
+    # ---- 合计行（在最后一条数据行的下一行）----
     if records:
-        total_row = len(records)  # 0-based
+        total_row = len(records) + 1  # 0-based（header=0, 数据=1..N, 合计=N+1）
         ws.write(total_row, 3, '合计：', total_label_fmt)
         ws.write_number(total_row, 4, total, total_money_fmt)
-        ws.set_row(total_row, 60)
+        ws.set_row(total_row, 40)
 
 
 def create_excel_with_images(data):
     """创建带图片的Excel - xlsxwriter 方案（稳定、跨平台、不依赖 Office）
-    核心：insert_image() + object_position=2 → Excel "放置在单元格中"（随单元格移动和调整大小）
-    优势：代码简洁、稳定、不需本机安装 Office、批量生成快
-    注意：需要 Excel 365 2023+ 或支持 Place-in-Cell 的版本（如新版 WPS）
+    核心：insert_image() + object_position=2 → 浮动图片（兼容所有Excel版本）
+    注意：embed_image() 需要 Excel 365 2023+，老版本会显示 #VALUE!
     """
     if not HAS_XLSXWRITER:
         raise Exception("缺少 xlsxwriter，请运行: pip install xlsxwriter")
@@ -461,12 +473,12 @@ def create_excel_with_images(data):
     # 费用模板
     if expense_records:
         ws1 = wb.add_worksheet('费用模板')
-        write_sheet_xlsx(ws1, expense_records, expense_imgs)
+        write_sheet_xlsx(wb, ws1, expense_records, expense_imgs)
 
     # 报销模板
     if reimburse_records:
         ws2 = wb.add_worksheet('报销模板')
-        write_sheet_xlsx(ws2, reimburse_records, reimburse_imgs)
+        write_sheet_xlsx(wb, ws2, reimburse_records, reimburse_imgs)
 
     # 无数据时保留一个空sheet
     if not expense_records and not reimburse_records:
@@ -557,15 +569,15 @@ def create_excel_with_com(data):
                 cell = ws.Cells(1, col_idx)
                 cell.Value = h
                 cell.Font.Bold = True
-                cell.Font.Size = 10
+                cell.Font.Size = 12
                 cell.Font.Name = '微软雅黑'
                 cell.Interior.ColorIndex = -4142  # 无背景色
                 cell.Font.Color = 0x000000  # 黑色
                 cell.HorizontalAlignment = -4108  # 水平居中
                 cell.VerticalAlignment = -4160  # 垂直居中
-            
-            # 设置列宽（标准列宽，第6列=40）
-            col_widths = [12, 16, 14, 18, 12, 40, 8, 14]
+
+            # 设置列宽（第6列=22，其他标准）
+            col_widths = [12, 16, 14, 18, 12, 22, 8, 14]
             for col_idx, width in enumerate(col_widths, 1):
                 try:
                     ws.Columns(col_idx).ColumnWidth = width
@@ -987,6 +999,67 @@ def main():
         server.serve_forever()
     except KeyboardInterrupt:
         shutdown(None, None)
+
+
+# ---------------------------------------------------------------------------
+# 图片真正的"放置在单元格中"：xlsx XML 后处理
+# ---------------------------------------------------------------------------
+import zipfile, re, shutil, os, tempfile
+
+def _embed_images_into_cells(xlsx_path):
+    """
+    xlsxwriter 生成的图片默认是 twoCellAnchor（浮动，不随单元格缩放）。
+    此函数将其改为 oneCellAnchor，使图片真正嵌入单元格。
+    """
+    tmp_dir = tempfile.mkdtemp(prefix='xlsx_embed_')
+    try:
+        # 解压 xlsx
+        with zipfile.ZipFile(xlsx_path, 'r') as z:
+            z.extractall(tmp_dir)
+
+        # 遍历所有 sheet 的 XML
+        xl_dir = os.path.join(tmp_dir, 'xl')
+        drawings_dir = os.path.join(xl_dir, 'drawings')
+        if not os.path.isdir(drawings_dir):
+            return
+
+        for drawing_file in os.listdir(drawings_dir):
+            if not drawing_file.endswith('.xml'):
+                continue
+            drawing_path = os.path.join(drawings_dir, drawing_file)
+
+            with open(drawing_path, 'r', encoding='utf-8') as f:
+                xml_content = f.read()
+
+            original = xml_content
+
+            # xlsxwriter 生成格式：<xdr:twoCellAnchor editAs="oneCell">...<xdr:from>...</xdr:from><xdr:to>...</xdr:to>...</xdr:twoCellAnchor>
+            # 目标格式：<xdr:oneCellAnchor>...<xdr:from>...</xdr:from>...</xdr:oneCellAnchor>（无 to 节点）
+            
+            # 1. 先把带属性的开标签统一处理（如 editAs="oneCell"）
+            xml_content = re.sub(r'<xdr:twoCellAnchor[^>]*>', '<xdr:oneCellAnchor>', xml_content)
+            # 2. 闭标签
+            xml_content = xml_content.replace('</xdr:twoCellAnchor>', '</xdr:oneCellAnchor>')
+            # 3. 去掉 <xdr:to>...</xdr:to> 节点（oneCellAnchor 不需要 to）
+            xml_content = re.sub(r'<xdr:to>.*?</xdr:to>', '', xml_content, flags=re.DOTALL)
+
+            if xml_content != original:
+                with open(drawing_path, 'w', encoding='utf-8') as f:
+                    f.write(xml_content)
+                logging.info(f"  图片已改为单元格嵌入: {drawing_file}")
+
+        # 重新打包 xlsx
+        tmp_xlsx = xlsx_path + '.tmp'
+        with zipfile.ZipFile(tmp_xlsx, 'w', compression=zipfile.ZIP_DEFLATED) as z:
+            for root, dirs, files in os.walk(tmp_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, tmp_dir)
+                    z.write(file_path, arcname)
+        os.replace(tmp_xlsx, xlsx_path)
+
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 if __name__ == '__main__':

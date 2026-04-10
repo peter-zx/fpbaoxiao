@@ -718,6 +718,7 @@
         clearForm(type);
         renderRecords(type);
         highlightStep(2);
+        saveToServer();  // 添加后自动保存到服务器
         showToast('✅ 记录已添加');
     }
 
@@ -820,6 +821,7 @@
         if (!confirm('确定删除这条记录？')) return;
         (type === 'expense' ? expenseRecords : reimburseRecords).splice(idx, 1);
         renderRecords(type);
+        saveToServer();  // 删除后自动保存
         showToast('记录已删除');
     }
 
@@ -905,6 +907,7 @@
         if (!confirm('确定清空所有数据？此操作不可恢复！')) return;
         expenseRecords = []; reimburseRecords = [];
         renderRecords('expense'); renderRecords('reimburse');
+        saveToServer();  // 清空后自动保存
         showToast('已清空所有数据');
     }
 
