@@ -365,9 +365,9 @@ def write_sheet_xlsx(wb, ws, records, img_map):
         'border': 1,
     })
 
-    # ---- 列宽：第6列(F)=25（截图列），其他标准 ----
+    # ---- 列宽：第6列(F)=15（截图列）----
     # xlsxwriter 列宽单位=字符数；1字符≈7.2pt(10pt雅黑)，即 1 char ≈ 9 px (96dpi)
-    col_widths = [12, 16, 14, 18, 12, 25, 8, 14]
+    col_widths = [12, 16, 14, 18, 12, 15, 8, 14]
     ws.set_column(0, 0, col_widths[0])  # A 时间
     ws.set_column(1, 1, col_widths[1])  # B 产品
     ws.set_column(2, 2, col_widths[2])  # C 关联项目
@@ -407,18 +407,13 @@ def write_sheet_xlsx(wb, ws, records, img_map):
             img_path, pil_img = img_map[data_row]
             orig_w, orig_h = pil_img.size
 
-            # 缩放图片至单元格 90%（列宽25字符≈180pt，行高200pt）
-            # 90% 填充：留少量内边距
-            max_w = 180  # 列宽 180 pt
-            max_h = 190  # 行高 190 pt
-            if orig_w > 0 and orig_h > 0:
-                scale = min(max_w / orig_w, max_h / orig_h, 1.0)
-                display_w = orig_w * scale
-                display_h = orig_h * scale
-                x_scale = display_w / orig_w
-                y_scale = display_h / orig_h
+            # 等比例缩放：宽高用同一个系数，高度=单元格高度，宽度自动等比
+            # xlsxwriter scale=原图像素×系数；row_height=200pt≈267px(96dpi)
+            if orig_h > 0:
+                scale = 200.0 / orig_h     # 统一系数：高度撑满200pt
+                x_scale = scale
+                y_scale = scale
             else:
-                display_w, display_h = max_w, max_h
                 x_scale = y_scale = 1.0
 
             ws.insert_image(
