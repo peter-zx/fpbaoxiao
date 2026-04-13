@@ -17,3 +17,6 @@ images/
 # Windows
 Thumbs.db
 Desktop.ini
+server.log 
+data.json 
+exports/

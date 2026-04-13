@@ -23,9 +23,14 @@ import time
 
 # Windows 终端 UTF-8 输出兼容
 if sys.platform == 'win32':
-    import codecs
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+    os.system('')  # 激活 ANSI 转义支持
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except AttributeError:
+        import codecs
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'replace')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'replace')
 
 from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
@@ -957,17 +962,27 @@ def main():
     lan_url = f"http://{local_ip}:{port}"
 
     # 打印启动信息
-    print("\n" + "=" * 52)
-    print("  报销费用填写工具 · 桌面版")
-    print("=" * 52)
-    print(f"\n  ✅ 服务已启动!")
-    print(f"\n  📱 访问方式:")
-    print(f"     本机:    {local_url}")
-    print(f"     局域网:  {lan_url}")
-    print(f"\n  📋 数据目录: {DATA_DIR}")
-    print(f"  📝 日志文件: {LOG_FILE}")
-    print(f"\n  停止服务: Ctrl+C")
-    print("=" * 52 + "\n")
+    H = '=' * 48
+    print()
+    print(f'  {H}')
+    print(f'  |{" " * 46}|')
+    print(f'  |    报销费用填写工具 v1.0                    |')
+    print(f'  |    Expense & Reimbursement Tool             |')
+    print(f'  |{" " * 46}|')
+    print(f'  {H}')
+    print()
+    print(f'    Author : aigc创意人竹相左边')
+    print(f'    Engine : Python + xlsxwriter')
+    print()
+    print(f'    {"-" * 44}')
+    print(f'    Status : Running')
+    print(f'    Local  : {local_url}')
+    print(f'    LAN    : {lan_url}')
+    print(f'    Data   : {DATA_DIR}')
+    print(f'    {"-" * 44}')
+    print()
+    print(f'    Stop: Ctrl+C')
+    print()
 
     # 自动打开浏览器
     def open_browser():
