@@ -784,6 +784,10 @@
     function addRecord(type) {
         const p = type === 'expense' ? 'e' : 'r';
         const time = document.getElementById(p + '-time').value;
+        const createdAt = new Date().toLocaleString('zh-CN', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit'
+        });
         const product = document.getElementById(p + '-product').value;
         const reason = document.getElementById(p + '-reason').value;
         const amount = document.getElementById(p + '-amount').value;
@@ -800,8 +804,11 @@
         const image = imgEl.style.display !== 'none' ? imgEl.src : null;
 
         const record = {
-            id: Date.now(), time, product,
-            related, reason,
+            id: Date.now(),
+            time,              // 实际发生时间（财务报销日期）
+            createdAt,         // 网页填写时间（时间轴分组依据）
+            product,
+            related,, reason,
             amount: parseFloat(amount),
             hasTicket: document.getElementById(p + '-ticket').value,
             ticketEntity: document.getElementById(p + '-entity').value,
@@ -898,19 +905,33 @@
 
     /* ====== 日期格式化 ====== */
     function formatDate(dateStr) {
-        const d = new Date(dateStr);
+        const d = new Date(dateStr.replace(/\//g, '-'));
         const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
         const month = d.getMonth() + 1;
         const day = d.getDate();
         const weekday = weekdays[d.getDay()];
-        return { display: `${month}月${day}日`, weekday };
+        const hasTime = dateStr.includes(':');
+        const display = hasTime
+            ? `${month}月${day}日 ${dateStr.split(' ')[1].slice(0, 5)}`
+            : `${month}月${day}日`;
+        return { display, weekday };
+    }
+
+    /* ====== 安全转义（用于HTML属性/JS字符串）====== */
+    function esc(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     /* ====== 按日期分组记录 ====== */
     function groupByDate(records) {
         const groups = {};
         records.forEach(r => {
-            const date = r.time || '未知日期';
+            const date = r.createdAt || new Date().toLocaleString('zh-CN');
             if (!groups[date]) groups[date] = [];
             groups[date].push(r);
         });
@@ -955,10 +976,10 @@
             // 默认：最新日期展开，其他折叠
             const isCollapsed = !isNewest;
 
-            html += `<div class="date-group ${isNewest ? 'newest' : ''} ${isCollapsed ? 'collapsed' : ''}" data-date="${group.date}">
+            html += `<div class="date-group ${isNewest ? 'newest' : ''} ${isCollapsed ? 'collapsed' : ''}" data-date="${esc(group.date)}">
                 <div class="date-group-header" onclick="toggleGroup(this)">
                     <input type="checkbox" class="group-check" ${allGroupChecked ? 'checked' : ''}
-                        onclick="event.stopPropagation(); toggleGroupAll('${type}', '${group.date}', this.checked)">
+                        onclick="event.stopPropagation(); toggleGroupAll('${type}', '${esc(group.date)}', this.checked)">
                     <span class="toggle-icon">▼</span>
                     <span class="date-label">${dateInfo.display}<span class="weekday">${dateInfo.weekday}</span></span>
                     <div class="date-stats">
@@ -971,7 +992,7 @@
                         <thead><tr>
                             <th style="width:36px;text-align:center">
                                 <input type="checkbox" ${allGroupChecked ? 'checked' : ''}
-                                    onchange="toggleGroupAll('${type}', '${group.date}', this.checked)" title="全选该日期">
+                                    onchange="toggleGroupAll('${type}', '${esc(group.date)}', this.checked)" title="全选该日期">
                             </th>
                             <th>时间</th><th>产品</th><th>${relatedLabel}</th>
                             <th>原因</th><th>金额</th><th>截图</th>
@@ -1029,7 +1050,7 @@
     /* ====== 日期组全选 ====== */
     function toggleGroupAll(type, date, checked) {
         const records = type === 'expense' ? expenseRecords : reimburseRecords;
-        records.filter(r => r.time === date).forEach(r => r._checked = checked);
+        records.filter(r => r.createdAt === date).forEach(r => r._checked = checked);
         renderRecords(type);
     }
 
