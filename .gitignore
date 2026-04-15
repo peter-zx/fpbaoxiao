@@ -1,22 +1,33 @@
-﻿# 鏈嶅姟杩愯浜х墿
-server.lock
-data/
-_img_tmp/
-
-# 瀵煎嚭鏂囦欢
-exports/*.xlsx
-exports/*.xls
-
-# Python 瀛楄妭鐮?__pycache__/
+# Python 字节码
+__pycache__/
 *.pyc
 *.pyo
 
-# 鏃х増閬楃暀锛堝凡琚唬鐮佹竻鐞嗭級
+# 服务运行产物
+server.lock
+server.log
+
+# 用户数据与导出（整个目录排除，保留目录结构）
+data/
+data.json
+_img_tmp/
+exports/
+
+# 旧版遗留
 images/
 
 # Windows
 Thumbs.db
 Desktop.ini
-server.log 
-data.json 
-exports/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# 环境变量配置
+.env
+.env.local
+
+# 配置（本地覆盖用，不要提交）
+config.json

@@ -1,8 +1,12 @@
 {
   "port": 8765,
+  "port_range_start": 8765,
+  "port_range_max": 100,
   "cors_origins": [
     "*"
   ],
   "log_level": "INFO",
-  "max_content_length": 20971520
+  "max_content_length": 20971520,
+  "auto_open_browser": true,
+  "single_instance": true
 }

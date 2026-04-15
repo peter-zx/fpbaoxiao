@@ -1,0 +1,11 @@
+{
+  "port": 8765,
+  "port_range_start": 8765,
+  "port_range_max": 100,
+  "cors_origins": ["*"],
+  "log_level": "INFO",
+  "max_content_length": 20971520,
+  "auto_open_browser": true,
+  "single_instance": true,
+  "_note": "复制此文件为 config.json 并修改其中的值，程序启动时优先读取 config.json"
+}
