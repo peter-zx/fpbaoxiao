@@ -808,7 +808,7 @@
             time,              // 实际发生时间（财务报销日期）
             createdAt,         // 网页填写时间（时间轴分组依据）
             product,
-            related,, reason,
+            related, reason,
             amount: parseFloat(amount),
             hasTicket: document.getElementById(p + '-ticket').value,
             ticketEntity: document.getElementById(p + '-entity').value,
@@ -931,7 +931,7 @@
     function groupByDate(records) {
         const groups = {};
         records.forEach(r => {
-            const date = r.createdAt || new Date().toLocaleString('zh-CN');
+            const date = r.createdAt || r.time;
             if (!groups[date]) groups[date] = [];
             groups[date].push(r);
         });
@@ -990,10 +990,7 @@
                 <div class="date-group-body">
                     <table class="records-table">
                         <thead><tr>
-                            <th style="width:36px;text-align:center">
-                                <input type="checkbox" ${allGroupChecked ? 'checked' : ''}
-                                    onchange="toggleGroupAll('${type}', '${esc(group.date)}', this.checked)" title="全选该日期">
-                            </th>
+                            <th style="width:36px"></th>
                             <th>时间</th><th>产品</th><th>${relatedLabel}</th>
                             <th>原因</th><th>金额</th><th>截图</th>
                             <th>有票</th><th>开票主体</th><th>操作</th>
