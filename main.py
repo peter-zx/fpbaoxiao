@@ -225,12 +225,16 @@ def main():
         print(f"端口 {start_port} 已被占用，自动使用端口 {port}")
 
     # 业务层
-    from app.store import load, save
+    from app.store import load as store_load, save as store_save
     from app.server import Server
 
     class DataStore:
-        def load(self): return load(DATA_DIR / 'data.json')
-        def save(self, data): return save(DATA_DIR / 'data.json', data)
+        """兼容旧接口，同时暴露 _data_file 供 server.py 内部访问"""
+        def __init__(self, data_file):
+            self._data_file = data_file
+
+        def load(self): return store_load(self._data_file)
+        def save(self, data): return store_save(self._data_file, data)
 
     class ExcelFactory:
         def create(self, data, output_dir):
@@ -239,10 +243,11 @@ def main():
 
     # 启动服务器
     static_dir = _get_static_dir()
+    data_file = DATA_DIR / 'data.json'
     server = Server(
         static_dir=static_dir,
         output_dir=DATA_DIR / 'exports',
-        data_store=DataStore(),
+        data_store=DataStore(data_file),
         excel_factory=ExcelFactory(),
         port=port,
     )

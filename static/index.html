@@ -38,6 +38,94 @@
         }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
+        /* 用户信息 */
+        .user-info {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 13px; color: rgba(255,255,255,0.9);
+        }
+        .user-info .username { font-weight: 600; }
+        .user-info .btn-logout {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white; padding: 4px 12px;
+            border-radius: 6px; cursor: pointer;
+            font-size: 12px; transition: all .2s;
+        }
+        .user-info .btn-logout:hover {
+            background: rgba(255,255,255,0.25);
+        }
+
+        /* 登录弹窗 */
+        .auth-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .auth-overlay.hidden { display: none; }
+        .auth-card {
+            background: white; border-radius: 16px;
+            width: 380px; max-width: 90vw;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .auth-header {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white; padding: 28px 24px 20px;
+            text-align: center;
+        }
+        .auth-header h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+        .auth-header p { font-size: 13px; opacity: 0.85; }
+        .auth-tabs {
+            display: flex; border-bottom: 1px solid #e5e7eb;
+        }
+        .auth-tab {
+            flex: 1; padding: 14px; text-align: center;
+            font-size: 14px; font-weight: 500; color: #6b7280;
+            cursor: pointer; border-bottom: 2px solid transparent;
+            transition: all .2s;
+        }
+        .auth-tab.active {
+            color: #4f46e5; border-bottom-color: #4f46e5;
+            font-weight: 600;
+        }
+        .auth-body { padding: 24px; }
+        .auth-body .form-group { margin-bottom: 16px; }
+        .auth-body .form-group label {
+            font-size: 13px; font-weight: 500; color: #374151;
+            margin-bottom: 6px; display: block;
+        }
+        .auth-body .form-group input {
+            width: 100%; padding: 11px 14px;
+            border: 1.5px solid #d1d5db;
+            border-radius: 8px; font-size: 14px;
+            transition: all .2s; background: #fafafa;
+        }
+        .auth-body .form-group input:focus {
+            border-color: #4f46e5; outline: none;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+        }
+        .btn-auth {
+            width: 100%; padding: 13px;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white; border: none; border-radius: 10px;
+            font-size: 15px; font-weight: 600;
+            cursor: pointer; transition: all .2s;
+            margin-top: 8px;
+        }
+        .btn-auth:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-auth:active { transform: translateY(0); }
+        .auth-error {
+            color: #ef4444; font-size: 13px; margin-top: 10px;
+            text-align: center; min-height: 20px;
+        }
+        .auth-hint {
+            text-align: center; font-size: 12px;
+            color: #9ca3af; margin-top: 12px;
+            line-height: 1.5;
+        }
+
         /* ========== 主体布局 ========== */
         .layout {
             display: flex;
@@ -481,7 +569,7 @@
         <h1>💰 报销费用填写工具</h1>
         <div class="sub">快速录入 → 保存 → 导出带图片的Excel给财务</div>
     </div>
-    <div class="status"><span class="dot"></span> 本地服务运行中</div>
+    <div class="status" id="top-user-area"></div>
 </div>
 
 <!-- ===== 主体 ===== -->
@@ -528,7 +616,10 @@
             填写完每条记录后记得点「添加记录」，<br>
             数据不会自动保存。<br><br>
             也可以先加完所有记录，<br>
-            最后一起保存和导出。
+            最后一起保存和导出。<br><br>
+            ⚠️ <b>导出 Excel 后需手动嵌入图片：</b><br>
+            右键图片 → 图片嵌入 → 将全部图片嵌入单元格<br>
+            <img src="/static/提醒.png" style="max-width:100%;border-radius:6px;margin-top:8px;border:1px solid #fde68a;" alt="操作示意图">
         </div>
     </div>
 
@@ -738,14 +829,311 @@
     <img id="modal-img" src="">
 </div>
 
+<!-- 登录注册弹窗 -->
+<div class="auth-overlay" id="auth-overlay">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h2>报销费用填写工具</h2>
+            <p>请先登录或注册账号</p>
+        </div>
+        <div class="auth-tabs">
+            <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">登录</div>
+            <div class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">注册</div>
+        </div>
+        <div class="auth-body">
+            <!-- 登录表单 -->
+            <div id="form-login">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="login-username" placeholder="请输入用户名" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="login-password" placeholder="请输入密码" autocomplete="current-password">
+                </div>
+                <button class="btn-auth" onclick="doLogin()">登录</button>
+                <div class="auth-error" id="login-error"></div>
+                <div class="auth-hint">没有账号？点上方「注册」创建新账号</div>
+            </div>
+            <!-- 注册表单 -->
+            <div id="form-register" style="display:none">
+                <div class="form-group">
+                    <label>设置用户名</label>
+                    <input type="text" id="reg-username" placeholder="2-20个字符，支持中英文" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>设置密码</label>
+                    <input type="password" id="reg-password" placeholder="至少4位密码" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label>确认密码</label>
+                    <input type="password" id="reg-password2" placeholder="再输入一次密码" autocomplete="new-password">
+                </div>
+                <button class="btn-auth" onclick="doRegister()">注册并登录</button>
+                <div class="auth-error" id="reg-error"></div>
+                <div class="auth-hint">注册即表示同意使用条款（内部工具，仅供个人使用）</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
-<script>
-    /* ====== 数据 ====== */
-    let expenseRecords = [];
+
+
+    <script>
+/* ====== 认证状态 ====== */
+    const AUTH_TOKEN_KEY = 'baoxiao_token';
+    const AUTH_USER_KEY  = 'baoxiao_user';
+    let currentUser = null;
+
+    function getToken() {
+        return localStorage.getItem(AUTH_TOKEN_KEY) || '';
+    }
+
+    function getAuthHeaders() {
+        const token = getToken();
+        return token ? { 'Authorization': 'Bearer ' + token } : {};
+    }
+
+    function setAuth(token, user) {
+        localStorage.setItem(AUTH_TOKEN_KEY, token);
+        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+        currentUser = user;
+        updateTopBar();
+        hideAuthOverlay();
+    }
+
+    function clearAuth() {
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        localStorage.removeItem(AUTH_USER_KEY);
+        currentUser = null;
+        expenseRecords = [];
+        reimburseRecords = [];
+        showAuthOverlay();
+        updateTopBar();
+    }
+
+    function loadAuth() {
+        const token = getToken();
+        const userStr = localStorage.getItem(AUTH_USER_KEY);
+        if (token && userStr) {
+            try {
+                currentUser = JSON.parse(userStr);
+                return true;
+            } catch(e) {}
+        }
+        return false;
+    }
+
+    function updateTopBar() {
+        const area = document.getElementById('top-user-area');
+        if (!area) return;
+        if (currentUser) {
+            area.innerHTML = '<div class="user-info">' +
+                '<span class="dot"></span>' +
+                '<span style="font-size:12px;opacity:0.8">欢迎</span>' +
+                '<span class="username">'+ esc(currentUser.username) +'</span>' +
+                '<button class="btn-logout" onclick="doLogout()">退出</button>' +
+                '</div>';
+        } else {
+            area.innerHTML = '<div class="user-info">' +
+                '<span class="dot"></span><span>本地服务运行中</span></div>';
+        }
+    }
+
+    function showAuthOverlay() {
+        const el = document.getElementById('auth-overlay');
+        if (el) el.classList.remove('hidden');
+    }
+
+    function hideAuthOverlay() {
+        const el = document.getElementById('auth-overlay');
+        if (el) el.classList.add('hidden');
+    }
+
+    /* ====== Tab切换 ====== */
+    function switchAuthTab(tab) {
+        document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+        document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+        document.getElementById('form-login').style.display    = tab === 'login'    ? 'block' : 'none';
+        document.getElementById('form-register').style.display   = tab === 'register' ? 'block' : 'none';
+        document.getElementById('login-error').textContent = '';
+        document.getElementById('reg-error').textContent   = '';
+    }
+
+    /* ====== 登录 ====== */
+    async function doLogin() {
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+        const errEl = document.getElementById('login-error');
+        errEl.textContent = '';
+
+        if (!username || !password) {
+            errEl.textContent = '用户名和密码不能为空'; return;
+        }
+
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setAuth(data.token, data.user);
+                showToast('登录成功，欢迎 ' + data.user.username);
+                await loadMyData();
+            } else {
+                errEl.textContent = data.error || '登录失败';
+            }
+        } catch (e) {
+            errEl.textContent = '网络错误，请检查服务器是否运行';
+        }
+    }
+
+    /* ====== 注册 ====== */
+    async function doRegister() {
+        const username = document.getElementById('reg-username').value.trim();
+        const password = document.getElementById('reg-password').value;
+        const password2 = document.getElementById('reg-password2').value;
+        const errEl = document.getElementById('reg-error');
+        errEl.textContent = '';
+
+        if (!username || !password) {
+            errEl.textContent = '用户名和密码不能为空'; return;
+        }
+        if (username.length < 2) {
+            errEl.textContent = '用户名至少2个字符'; return;
+        }
+        if (password.length < 4) {
+            errEl.textContent = '密码至少4位'; return;
+        }
+        if (password !== password2) {
+            errEl.textContent = '两次密码不一致'; return;
+        }
+
+        try {
+            const res = await fetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setAuth(data.token, data.user);
+                showToast('注册成功，欢迎 ' + data.user.username);
+                await loadMyData();
+            } else {
+                errEl.textContent = data.error || '注册失败';
+            }
+        } catch (e) {
+            errEl.textContent = '网络错误，请检查服务器是否运行';
+        }
+    }
+
+    /* ====== 登出 ====== */
+    async function doLogout() {
+        try {
+            await fetch('/api/logout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                body: JSON.stringify({})
+            });
+        } catch(e) {}
+        clearAuth();
+        showToast('已退出登录');
+    }
+
+    /* ====== 数据（带认证） ====== */
+    async function loadMyData() {
+        try {
+            const res = await fetch('/api/load', {
+                headers: getAuthHeaders()
+            });
+            const result = await res.json();
+            if (!result.success) {
+                if (result.error && result.error.includes('登录')) {
+                    showAuthOverlay();
+                }
+                return;
+            }
+            expenseRecords   = (result.data.expense   || []).map(r => ({...r, _checked: r._checked !== false}));
+            reimburseRecords = (result.data.reimburse || []).map(r => ({...r, _checked: r._checked !== false}));
+            renderRecords('expense');
+            renderRecords('reimburse');
+            if (expenseRecords.length || reimburseRecords.length) {
+                showToast('数据已加载，共 ' + (expenseRecords.length + reimburseRecords.length) + ' 条');
+            }
+        } catch(e) {
+            console.log('加载数据失败', e);
+        }
+    }
+
+    /* ====== 保存（带认证） ====== */
+    function saveToServer() {
+        if (!getToken()) return;
+        fetch('/api/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+            body: JSON.stringify({ expense: expenseRecords, reimburse: reimburseRecords })
+        }).then(res => { if (res.ok) highlightStep(3); }).catch(() => {});
+    }
+
+    /* ====== 导出（带认证） ====== */
+    async function exportToExcel() {
+        if (!getToken()) { showToast('请先登录', true); return; }
+        const selectedExpense = expenseRecords.filter(r => r._checked);
+        const selectedReimburse = reimburseRecords.filter(r => r._checked);
+        const hasSelection = selectedExpense.length > 0 || selectedReimburse.length > 0;
+        const hasAnyData = expenseRecords.length > 0 || reimburseRecords.length > 0;
+
+        if (!hasAnyData)  { showToast('没有数据可导出', true); return; }
+        if (!hasSelection) { showToast('请先勾选要导出的记录', true); return; }
+
+        try {
+            const res = await fetch('/api/export', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                body: JSON.stringify({ expense: selectedExpense, reimburse: selectedReimburse })
+            });
+            const data = await res.json();
+            if (data.success) {
+                const total = selectedExpense.length + selectedReimburse.length;
+                showToast('已导出 ' + total + ' 条记录：' + data.filename);
+                const fileRes = await fetch(data.download_url);
+                const blob = await fileRes.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = data.filename;
+                document.body.appendChild(a); a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                highlightStep(4);
+            } else {
+                showToast('导出失败：' + (data.error || ''), true);
+            }
+        } catch (e) {
+            showToast('导出失败，请检查服务器', true);
+        }
+    }
+
+    /* ====== 清空（带认证） ====== */
+    function clearAll() {
+        if (!getToken()) { showToast('请先登录', true); return; }
+        if (!confirm('确定清空所有数据？此操作不可恢复！')) return;
+        expenseRecords = [];
+        reimburseRecords = [];
+        renderRecords('expense');
+        renderRecords('reimburse');
+        showToast('已清空所有数据');
+    }
+
+    /* ====== 数据（本地） ====== */
+    let expenseRecords   = [];
     let reimburseRecords = [];
-    let currentType = 'expense';
+    let currentType      = 'expense';
     const API = '';
 
     /* ====== 初始化 ====== */
@@ -753,10 +1141,26 @@
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('e-time').value = today;
         document.getElementById('r-time').value = today;
-        loadFromServer();
+
+        // 尝试恢复登录状态
+        if (!loadAuth()) {
+            showAuthOverlay();
+            return;
+        }
+        updateTopBar();
+        loadMyData();
+
+        // 回车键登录/注册
+        document.getElementById('login-password').addEventListener('keydown', e => {
+            if (e.key === 'Enter') doLogin();
+        });
+        document.getElementById('reg-password2').addEventListener('keydown', e => {
+            if (e.key === 'Enter') doRegister();
+        });
     });
 
-    /* ====== 切换费用/报销 ====== */
+    /* ====== 其他函数保持不变 ====== */
+
     function switchType(type) {
         currentType = type;
         document.querySelectorAll('.type-tab').forEach(t => t.classList.remove('active'));
@@ -765,7 +1169,6 @@
         document.getElementById('panel-' + type).classList.add('active');
     }
 
-    /* ====== 图片预览 ====== */
     function previewImg(input, previewId, areaEl) {
         const preview = document.getElementById(previewId);
         const placeholder = areaEl.querySelector('.upload-placeholder');
@@ -780,51 +1183,46 @@
         }
     }
 
-    /* ====== 添加记录 ====== */
     function addRecord(type) {
+        if (!getToken()) { showToast('请先登录', true); return; }
         const p = type === 'expense' ? 'e' : 'r';
         const time = document.getElementById(p + '-time').value;
         const createdAt = new Date().toLocaleString('zh-CN', {
-            year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit'
+            year:'numeric', month:'2-digit', day:'2-digit',
+            hour:'2-digit', minute:'2-digit'
         });
         const product = document.getElementById(p + '-product').value;
-        const reason = document.getElementById(p + '-reason').value;
-        const amount = document.getElementById(p + '-amount').value;
-
+        const reason  = document.getElementById(p + '-reason').value;
+        const amount  = document.getElementById(p + '-amount').value;
         if (!time || !product || !reason || !amount) {
             showToast('请填写所有带 * 的必填字段', true); return;
         }
-
         const related = type === 'expense'
             ? document.getElementById('e-project').value
             : document.getElementById('r-customer').value;
-
         const imgEl = document.getElementById(p + '-preview');
         const image = imgEl.style.display !== 'none' ? imgEl.src : null;
-
         const record = {
             id: Date.now(),
-            time,              // 实际发生时间（财务报销日期）
-            createdAt,         // 网页填写时间（时间轴分组依据）
+            time,
+            createdAt,
             product,
-            related, reason,
+            related,
+            reason,
             amount: parseFloat(amount),
             hasTicket: document.getElementById(p + '-ticket').value,
             ticketEntity: document.getElementById(p + '-entity').value,
             image,
             _checked: true
         };
-
         (type === 'expense' ? expenseRecords : reimburseRecords).push(record);
         clearForm(type);
         renderRecords(type);
         highlightStep(2);
         saveToServer();
-        showToast('✅ 记录已添加');
+        showToast('记录已添加');
     }
 
-    /* ====== 清空表单 ====== */
     function clearForm(type) {
         const p = type === 'expense' ? 'e' : 'r';
         const today = new Date().toISOString().split('T')[0];
@@ -835,7 +1233,6 @@
         document.getElementById(p + '-entity').value = '';
         if (type === 'expense') document.getElementById('e-project').value = '';
         else document.getElementById('r-customer').value = '';
-
         const preview = document.getElementById(p + '-preview');
         preview.style.display = 'none'; preview.src = '';
         const placeholder = document.getElementById(p + '-placeholder');
@@ -843,7 +1240,6 @@
         document.getElementById(p + '-img').value = '';
     }
 
-    /* ====== 金额转大写汉字 ====== */
     function toChineseMoney(num) {
         if (!num || isNaN(num)) return '零元整';
         const part = Math.round(num * 100).toString();
@@ -852,12 +1248,10 @@
         const units = ['元整', '万', '亿'];
         const digits = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖'];
         const places = ['', '拾', '佰', '仟'];
-
         let result = '';
         let no = intPart.replace(/^0+/, '') || '0';
         let unitIdx = 0;
         let prevZero = false;
-
         while (no.length > 0) {
             const chunk = no.slice(-4);
             no = no.slice(0, -4);
@@ -865,9 +1259,8 @@
             for (let i = 0; i < chunk.length; i++) {
                 const d = parseInt(chunk[i]);
                 const pos = chunk.length - 1 - i;
-                if (d === 0) {
-                    prevZero = true;
-                } else {
+                if (d === 0) { prevZero = true; }
+                else {
                     if (prevZero) { chunkRes += '零'; prevZero = false; }
                     chunkRes += digits[d] + places[pos % 4];
                 }
@@ -879,31 +1272,18 @@
             }
             unitIdx++;
         }
-
         if (result === '元整') result = '零元整';
-
-        // 小数部分
         let decStr = '';
         const d1 = parseInt(decPart[0]);
         const d2 = parseInt(decPart[1]);
-        if (d1 === 0 && d2 === 0) {
-            // 已是整数
-        } else if (d1 === 0) {
-            decStr = '零' + digits[d2] + '分';
-        } else if (d2 === 0) {
-            decStr = digits[d1] + '角';
-        } else {
-            decStr = digits[d1] + '角' + digits[d2] + '分';
-        }
-
-        if (decStr) {
-            result = result.replace('元整', '') + '元' + decStr;
-        }
-
+        if (d1 === 0 && d2 === 0) {}
+        else if (d1 === 0) decStr = '零' + digits[d2] + '分';
+        else if (d2 === 0) decStr = digits[d1] + '角';
+        else decStr = digits[d1] + '角' + digits[d2] + '分';
+        if (decStr) result = result.replace('元整', '') + '元' + decStr;
         return result || '零元整';
     }
 
-    /* ====== 日期格式化 ====== */
     function formatDate(dateStr) {
         const d = new Date(dateStr.replace(/\//g, '-'));
         const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
@@ -912,12 +1292,11 @@
         const weekday = weekdays[d.getDay()];
         const hasTime = dateStr.includes(':');
         const display = hasTime
-            ? `${month}月${day}日 ${dateStr.split(' ')[1].slice(0, 5)}`
-            : `${month}月${day}日`;
+            ? month + '月' + day + '日 ' + dateStr.split(' ')[1].slice(0, 5)
+            : month + '月' + day + '日';
         return { display, weekday };
     }
 
-    /* ====== 安全转义（用于HTML属性/JS字符串）====== */
     function esc(str) {
         return String(str)
             .replace(/&/g, '&amp;')
@@ -927,7 +1306,6 @@
             .replace(/'/g, '&#39;');
     }
 
-    /* ====== 按日期分组记录 ====== */
     function groupByDate(records) {
         const groups = {};
         records.forEach(r => {
@@ -939,19 +1317,20 @@
         return sortedDates.map(date => ({ date, records: groups[date] }));
     }
 
-    /* ====== 渲染记录（按日期分组折叠） ====== */
     function renderRecords(type) {
         const records = type === 'expense' ? expenseRecords : reimburseRecords;
         const p = type === 'expense' ? 'e' : 'r';
         const container = document.getElementById(p + '-records');
         const countEl = document.getElementById(p + '-count');
-        const checkedCount = records.filter(r => r._checked).length;
-        const checkedAmount = records.filter(r => r._checked).reduce((s, r) => s + r.amount, 0);
+        if (!container) return;
+        const checkedCount   = records.filter(r => r._checked).length;
+        const checkedAmount   = records.filter(r => r._checked).reduce((s, r) => s + r.amount, 0);
         const checkedAmountCN = checkedAmount > 0 ? toChineseMoney(checkedAmount) : '';
+
         if (records.length > 0) {
             countEl.innerHTML = checkedCount > 0
-                ? `共 ${records.length} 条，已选 ${checkedCount} 条&nbsp;&nbsp;<span style="color:#dc2626;font-weight:700">¥${checkedAmount.toFixed(2)}</span><span style="color:#9ca3af;font-size:12px;margin-left:4px">${checkedAmountCN}</span>`
-                : `共 ${records.length} 条`;
+                ? '共 ' + records.length + ' 条，已选 ' + checkedCount + ' 条&nbsp;&nbsp;<span style="color:#dc2626;font-weight:700">¥' + checkedAmount.toFixed(2) + '</span><span style="color:#9ca3af;font-size:12px;margin-left:4px">' + checkedAmountCN + '</span>'
+                : '共 ' + records.length + ' 条';
         } else {
             countEl.textContent = '共 0 条';
         }
@@ -967,205 +1346,107 @@
         let html = '';
         groups.forEach((group, gi) => {
             const isNewest = gi === 0;
-            const groupChecked = group.records.filter(r => r._checked).length;
-            const groupTotal = group.records.length;
-            const groupCheckedAmount = group.records.filter(r => r._checked).reduce((sum, r) => sum + r.amount, 0);
-            const allGroupChecked = group.records.every(r => r._checked);
+            const groupTotal       = group.records.length;
+            const groupChecked      = group.records.filter(r => r._checked).length;
+            const groupCheckedAmt   = group.records.filter(r => r._checked).reduce((sum, r) => sum + r.amount, 0);
+            const allGroupChecked   = group.records.every(r => r._checked);
             const dateInfo = formatDate(group.date);
 
-            // 默认：最新日期展开，其他折叠
-            const isCollapsed = !isNewest;
-
-            html += `<div class="date-group ${isNewest ? 'newest' : ''} ${isCollapsed ? 'collapsed' : ''}" data-date="${esc(group.date)}">
-                <div class="date-group-header" onclick="toggleGroup(this)">
-                    <input type="checkbox" class="group-check" ${allGroupChecked ? 'checked' : ''}
-                        onclick="event.stopPropagation(); toggleGroupAll('${type}', '${esc(group.date)}', this.checked)">
-                    <span class="toggle-icon">▼</span>
-                    <span class="date-label">${dateInfo.display}<span class="weekday">${dateInfo.weekday}</span></span>
-                    <div class="date-stats">
-                        <span class="stat-item">共 <span class="num">${groupTotal}</span> 条</span>
-                        <span class="stat-item stat-amount">¥${groupCheckedAmount.toFixed(2)}</span>
-                    </div>
-                </div>
-                <div class="date-group-body">
-                    <table class="records-table">
-                        <thead><tr>
-                            <th style="width:36px"></th>
-                            <th>时间</th><th>产品</th><th>${relatedLabel}</th>
-                            <th>原因</th><th>金额</th><th>截图</th>
-                            <th>有票</th><th>开票主体</th><th>操作</th>
-                        </tr></thead><tbody>`;
+            html += '<div class="date-group ' + (isNewest ? 'newest' : '') + ' ' + (isNewest ? '' : 'collapsed') + '" data-date="' + esc(group.date) + '">' +
+                '<div class="date-group-header" onclick="toggleGroup(this)">' +
+                '<input type="checkbox" class="group-check" ' + (allGroupChecked ? 'checked' : '') + ' onclick="event.stopPropagation(); toggleGroupAll(\'' + type + '\',\'' + esc(group.date) + '\',' + allGroupChecked + ')">' +
+                '<span class="toggle-icon">' + (isNewest ? '▼' : '▶') + '</span>' +
+                '<span class="date-label">' + dateInfo.display + '<span class="weekday">' + dateInfo.weekday + '</span></span>' +
+                '<div class="date-stats">' +
+                '<span class="stat-item">共 <span class="num">' + groupTotal + '</span> 条</span>' +
+                '<span class="stat-item stat-amount">¥' + groupCheckedAmt.toFixed(2) + '</span>' +
+                '</div></div>' +
+                '<div class="date-group-body">' +
+                '<table class="records-table"><thead><tr>' +
+                '<th style="width:36px"></th><th>时间</th><th>产品</th><th>' + relatedLabel + '</th>' +
+                '<th>原因</th><th>金额</th><th>截图</th><th>有票</th><th>开票主体</th><th>操作</th>' +
+                '</tr></thead><tbody>';
 
             group.records.forEach((r) => {
                 const globalIdx = records.indexOf(r);
                 const imgHtml = r.image
-                    ? `<div class="img-cell"><img src="${r.image}" onclick="showModal('${r.image}')"></div>`
+                    ? '<div class="img-cell"><img src="' + (r.image||'') + '" onclick="showModal(this.src)"></div>'
                     : '<span style="color:#ccc">-</span>';
-                html += `<tr style="${r._checked ? 'background:#f0fdf4' : ''}">
-                    <td style="text-align:center">
-                        <input type="checkbox" ${r._checked ? 'checked' : ''}
-                            onchange="toggleRecord('${type}',${globalIdx},this.checked)">
-                    </td>
-                    <td>${r.time}</td><td>${r.product}</td><td>${r.related||'-'}</td>
-                    <td>${r.reason}</td>
-                    <td class="amount">¥${r.amount.toFixed(2)}</td>
-                    <td>${imgHtml}</td>
-                    <td>${r.hasTicket}</td><td>${r.ticketEntity||'-'}</td>
-                    <td><button class="btn btn-sm btn-clear" onclick="delRecord('${type}',${globalIdx})">删除</button></td>
-                </tr>`;
+                html += '<tr' + (r._checked ? ' style="background:#f0fdf4"' : '') + '>' +
+                    '<td style="text-align:center"><input type="checkbox" ' + (r._checked ? 'checked' : '') + ' onchange="toggleRecord(\'' + type + '\',' + globalIdx + ',this.checked)"></td>' +
+                    '<td>' + r.time + '</td><td>' + esc(r.product) + '</td><td>' + (r.related ? esc(r.related) : '-') + '</td>' +
+                    '<td>' + esc(r.reason) + '</td>' +
+                    '<td class="amount">¥' + r.amount.toFixed(2) + '</td><td>' + imgHtml + '</td>' +
+                    '<td>' + (r.hasTicket || '-') + '</td><td>' + (r.ticketEntity ? esc(r.ticketEntity) : '-') + '</td>' +
+                    '<td><button class="btn btn-sm btn-clear" onclick="delRecord(\'' + type + '\',' + globalIdx + ')">删除</button></td>' +
+                    '</tr>';
             });
 
-            html += `</tbody></table></div></div>`;
+            html += '</tbody></table></div></div>';
         });
 
-        // 全局合计
-        const totalAll = records.reduce((sum, r) => sum + r.amount, 0);
+        const totalAll     = records.reduce((sum, r) => sum + r.amount, 0);
         const totalChecked = records.filter(r => r._checked).reduce((sum, r) => sum + r.amount, 0);
-        const totalAllCN = toChineseMoney(totalAll);
+        const totalAllCN   = toChineseMoney(totalAll);
         const totalCheckedCN = totalChecked > 0 ? toChineseMoney(totalChecked) : '';
-        html += `<div style="margin-top:12px;padding:12px 16px;background:#f8fafc;border-radius:8px;font-size:13px;">
-            <span style="color:#6b7280">全部合计：</span><span style="color:#dc2626;font-weight:700">¥${totalAll.toFixed(2)}</span>
-            <span style="color:#9ca3af;font-size:12px;margin-left:6px">${totalAllCN}</span>
-            ${checkedCount > 0 && checkedCount < records.length
-                ? `<span style="margin-left:20px;color:#059669">选中合计：</span><span style="color:#059669;font-weight:700">¥${totalChecked.toFixed(2)}</span><span style="color:#9ca3af;font-size:12px;margin-left:6px">${totalCheckedCN}</span>`
-                : checkedCount > 0 && checkedCount === records.length
-                ? `<span style="margin-left:20px;color:#059669">选中合计：</span><span style="color:#059669;font-weight:700">¥${totalChecked.toFixed(2)}</span><span style="color:#9ca3af;font-size:12px;margin-left:6px">${totalCheckedCN}</span>`
-                : ''}
-        </div>`;
+        html += '<div style="margin-top:12px;padding:12px 16px;background:#f8fafc;border-radius:8px;font-size:13px;">' +
+            '<span style="color:#6b7280">全部合计：</span><span style="color:#dc2626;font-weight:700">¥' + totalAll.toFixed(2) + '</span>' +
+            '<span style="color:#9ca3af;font-size:12px;margin-left:6px">' + totalAllCN + '</span>' +
+            (checkedCount > 0 ? ' <span style="margin-left:20px;color:#059669">选中合计：</span><span style="color:#059669;font-weight:700">¥' + totalChecked.toFixed(2) + '</span>' : '') +
+            '</div>';
 
         container.innerHTML = html;
     }
 
-    /* ====== 折叠/展开日期组 ====== */
     function toggleGroup(headerEl) {
         const group = headerEl.closest('.date-group');
-        if (group) {
-            group.classList.toggle('collapsed');
-        }
+        if (group) group.classList.toggle('collapsed');
+        const icon = headerEl.querySelector('.toggle-icon');
+        if (icon) icon.textContent = group.classList.contains('collapsed') ? '▶' : '▼';
     }
 
-    /* ====== 日期组全选 ====== */
     function toggleGroupAll(type, date, checked) {
         const records = type === 'expense' ? expenseRecords : reimburseRecords;
-        records.filter(r => r.createdAt === date).forEach(r => r._checked = checked);
+        records.filter(r => (r.createdAt || r.time) === date).forEach(r => r._checked = checked);
         renderRecords(type);
     }
 
-    /* ====== 全选/反选所有 ====== */
     function toggleSelectAll(type, checked) {
         const records = type === 'expense' ? expenseRecords : reimburseRecords;
         records.forEach(r => r._checked = checked);
         renderRecords(type);
     }
 
-    /* ====== 勾选单条记录 ====== */
     function toggleRecord(type, idx, checked) {
         const records = type === 'expense' ? expenseRecords : reimburseRecords;
-        records[idx]._checked = checked;
-        renderRecords(type);
+        if (records[idx]) { records[idx]._checked = checked; renderRecords(type); }
     }
 
-    /* ====== 删除记录 ====== */
     function delRecord(type, idx) {
         if (!confirm('确定删除这条记录？')) return;
-        (type === 'expense' ? expenseRecords : reimburseRecords).splice(idx, 1);
+        const arr = type === 'expense' ? expenseRecords : reimburseRecords;
+        arr.splice(idx, 1);
         renderRecords(type);
         saveToServer();
         showToast('记录已删除');
     }
 
-    /* ====== 图片弹窗 ====== */
     function showModal(src) {
         document.getElementById('modal-img').src = src;
         document.getElementById('img-modal').classList.add('show');
     }
 
-    /* ====== 导出 ====== */
-    async function exportToExcel() {
-        const selectedExpense = expenseRecords.filter(r => r._checked);
-        const selectedReimburse = reimburseRecords.filter(r => r._checked);
-        const hasSelection = selectedExpense.length > 0 || selectedReimburse.length > 0;
-        const hasAnyData = expenseRecords.length > 0 || reimburseRecords.length > 0;
-
-        if (!hasAnyData) { showToast('没有数据可导出', true); return; }
-        if (!hasSelection) {
-            showToast('请先勾选要导出的记录', true); return;
-        }
-
-        try {
-            const res = await fetch(API + '/api/export', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ expense: selectedExpense, reimburse: selectedReimburse })
-            });
-            const data = await res.json();
-            if (data.success) {
-                const total = selectedExpense.length + selectedReimburse.length;
-                showToast('📄 已导出 ' + total + ' 条记录：' + data.filename);
-                try {
-                    const fileRes = await fetch(data.download_url);
-                    const blob = await fileRes.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = data.filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                } catch (e) {
-                    showToast('下载文件时出错，请手动保存', true);
-                }
-                highlightStep(4);
-            } else {
-                showToast('导出失败：' + data.error, true);
-            }
-        } catch (e) { showToast('导出失败，请检查服务器', true); }
-    }
-
-    /* ====== 保存 ====== */
-    async function saveToServer() {
-        try {
-            const res = await fetch(API + '/api/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ expense: expenseRecords, reimburse: reimburseRecords })
-            });
-            if (res.ok) { showToast('💾 数据已保存'); highlightStep(3); }
-            else showToast('保存失败', true);
-        } catch (e) { showToast('保存失败，请检查服务器', true); }
-    }
-
-    /* ====== 加载 ====== */
     async function loadFromServer() {
-        try {
-            const res = await fetch(API + '/api/load');
-            const data = await res.json();
-            expenseRecords = (data.expense || []).map(r => ({ ...r, _checked: r._checked !== false }));
-            reimburseRecords = (data.reimburse || []).map(r => ({ ...r, _checked: r._checked !== false }));
-            renderRecords('expense');
-            renderRecords('reimburse');
-            if (expenseRecords.length || reimburseRecords.length) showToast('📂 数据已加载');
-        } catch (e) { console.log('无历史数据'); }
+        if (!getToken()) return;
+        await loadMyData();
     }
 
-    /* ====== 清空 ====== */
-    function clearAll() {
-        if (!confirm('确定清空所有数据？此操作不可恢复！')) return;
-        expenseRecords = []; reimburseRecords = [];
-        renderRecords('expense'); renderRecords('reimburse');
-        saveToServer();
-        showToast('已清空所有数据');
-    }
-
-    /* ====== 左侧步骤高亮 ====== */
     function highlightStep(num) {
         document.querySelectorAll('.guide-step').forEach(s => s.classList.remove('active'));
         const el = document.getElementById('gs-' + num);
         if (el) el.classList.add('active');
     }
 
-    /* ====== 滚动到区块 ====== */
     function scrollToSection(id) {
         const el = document.getElementById(id);
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1173,13 +1454,14 @@
         highlightStep(num);
     }
 
-    /* ====== Toast ====== */
     function showToast(msg, err) {
         const t = document.getElementById('toast');
         t.textContent = msg;
         t.className = 'toast show' + (err ? ' error' : '');
         setTimeout(() => t.classList.remove('show'), 3000);
     }
+
+
 </script>
 </body>
 </html>
