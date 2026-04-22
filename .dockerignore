@@ -1,0 +1,34 @@
+# 版本控制
+.git/
+.gitignore
+.gitattributes
+
+# 文档与临时文件
+*.md
+*.bak.*
+*.log
+*.lock
+
+# 开发工具
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+
+# 不需要的前端入口（用 static/index.html）
+index.html
+
+# Windows 专属
+start.bat
+build.spec
+Desktop.ini
+Thumbs.db
+
+# 本地数据（不要带入镜像）
+data/
+data.json
+_img_tmp/
+exports/
+server.lock
+server.log
+config.json
