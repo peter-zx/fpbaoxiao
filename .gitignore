@@ -1,19 +1,19 @@
-# Python 字节码
+# Python
 __pycache__/
 *.pyc
 *.pyo
 
-# 服务运行产物
+# Service
 server.lock
 server.log
 
-# 用户数据与导出（整个目录排除，保留目录结构）
+# Data & exports
 data/
 data.json
 _img_tmp/
 exports/
 
-# 旧版遗留
+# Legacy
 images/
 
 # Windows
@@ -25,9 +25,16 @@ Desktop.ini
 .idea/
 .DS_Store
 
-# 环境变量配置
+# Environment
 .env
 .env.local
 
-# 配置（本地覆盖用，不要提交）
+# Local config (override, do not commit)
 config.json
+
+# Temp scripts (local dev only)
+_fix*.py
+_fix_*.py
+_temp*.js
+_upgrade*.py
+*.bak.*
