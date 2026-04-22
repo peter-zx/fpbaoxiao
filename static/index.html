@@ -988,7 +988,7 @@
     }
 
     /* ====== Tab切换 ====== */
-    function switchAuthTab(tab) {
+    async function switchAuthTab(tab) {
         document.getElementById('tab-login').classList.toggle('active', tab === 'login');
         document.getElementById('tab-register').classList.toggle('active', tab === 'register');
         document.getElementById('form-login').style.display    = tab === 'login'    ? 'block' : 'none';
@@ -1530,7 +1530,7 @@
         showToast('记录已删除');
     }
 
-    function showModal(src) {
+    async function showModal(src) {
         document.getElementById('modal-img').src = src;
         document.getElementById('img-modal').classList.add('show');
     }
